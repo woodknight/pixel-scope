@@ -22,12 +22,43 @@ constexpr int kWindowHeight = 800;
 constexpr float kZoomStep = 1.15f;
 constexpr float kBaseFontSize = 16.0f;
 constexpr float kBaseStatusBarHeight = 28.0f;
+constexpr float kGridMinZoom = 8.0f;
 
 pixelscope::core::Rect to_rect(const ImVec2& min, const ImVec2& size) {
   return {.x = min.x, .y = min.y, .w = size.x, .h = size.y};
 }
 
 pixelscope::core::Vec2 to_vec2(const ImVec2& value) { return {.x = value.x, .y = value.y}; }
+
+void draw_pixel_grid_overlay(
+    ImDrawList* draw_list,
+    const pixelscope::core::Rect& image_bounds,
+    int image_width,
+    int image_height,
+    float zoom) {
+  if (draw_list == nullptr || image_width <= 0 || image_height <= 0 || zoom < kGridMinZoom) {
+    return;
+  }
+
+  const ImU32 grid_color = IM_COL32(255, 255, 255, 48);
+  for (int x = 0; x <= image_width; ++x) {
+    const float screen_x = image_bounds.x + static_cast<float>(x) * zoom;
+    draw_list->AddLine(
+        ImVec2(screen_x, image_bounds.y),
+        ImVec2(screen_x, image_bounds.y + image_bounds.h),
+        grid_color,
+        1.0f);
+  }
+
+  for (int y = 0; y <= image_height; ++y) {
+    const float screen_y = image_bounds.y + static_cast<float>(y) * zoom;
+    draw_list->AddLine(
+        ImVec2(image_bounds.x, screen_y),
+        ImVec2(image_bounds.x + image_bounds.w, screen_y),
+        grid_color,
+        1.0f);
+  }
+}
 
 }  // namespace
 
@@ -357,6 +388,8 @@ void App::draw_menu(bool& request_open_dialog) {
       view_.pan = {};
       view_initialized_ = true;
     }
+    ImGui::Separator();
+    ImGui::MenuItem("Pixel Grid", nullptr, &show_pixel_grid_, has_image);
     ImGui::EndMenu();
   }
 
@@ -397,6 +430,14 @@ void App::draw_canvas() {
         reinterpret_cast<ImTextureID>(texture),
         ImVec2(image_bounds.x, image_bounds.y),
         ImVec2(image_bounds.x + image_bounds.w, image_bounds.y + image_bounds.h));
+    if (show_pixel_grid_) {
+      draw_pixel_grid_overlay(
+          draw_list,
+          image_bounds,
+          image_.metadata().width,
+          image_.metadata().height,
+          view_.zoom);
+    }
   }
 
   const bool hovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
