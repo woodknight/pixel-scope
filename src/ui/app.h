@@ -5,6 +5,8 @@
 #include <optional>
 #include <string>
 
+#include <imgui.h>
+
 #include "core/image.h"
 #include "core/viewport.h"
 #include "render/texture_cache.h"
@@ -29,6 +31,9 @@ class App {
 
   bool load_image(const std::string& path);
   void fit_image_to_canvas(float width, float height);
+  [[nodiscard]] float compute_ui_scale() const;
+  void apply_ui_scale(float scale);
+  void update_ui_scale_if_needed();
   void process_event(const SDL_Event& event, bool& running, bool& request_open_dialog);
   void draw_ui(bool& request_open_dialog);
   void draw_menu(bool& request_open_dialog);
@@ -42,6 +47,8 @@ class App {
   pixelscope::core::ImageData image_;
   pixelscope::core::ViewState view_;
   bool view_initialized_ = false;
+  float ui_scale_ = 1.0f;
+  ImGuiStyle base_style_ = {};
   pixelscope::render::TextureCache texture_cache_;
   std::string last_error_;
   HoverState hover_;

@@ -2,10 +2,10 @@
 
 #include <SDL.h>
 
+#include <algorithm>
 #include <cmath>
 #include <utility>
 
-#include <imgui.h>
 #include <backends/imgui_impl_sdl2.h>
 #include <backends/imgui_impl_sdlrenderer2.h>
 
@@ -19,6 +19,8 @@ namespace {
 constexpr int kWindowWidth = 1280;
 constexpr int kWindowHeight = 800;
 constexpr float kZoomStep = 1.15f;
+constexpr float kBaseFontSize = 16.0f;
+constexpr float kBaseStatusBarHeight = 28.0f;
 
 pixelscope::core::Rect to_rect(const ImVec2& min, const ImVec2& size) {
   return {.x = min.x, .y = min.y, .w = size.x, .h = size.y};
@@ -78,9 +80,11 @@ bool App::initialize() {
   style.WindowRounding = 4.0f;
   style.FrameRounding = 4.0f;
   style.Colors[ImGuiCol_WindowBg] = ImVec4(0.08f, 0.09f, 0.11f, 1.0f);
+  base_style_ = style;
 
   ImGui_ImplSDL2_InitForSDLRenderer(window_, renderer_);
   ImGui_ImplSDLRenderer2_Init(renderer_);
+  apply_ui_scale(compute_ui_scale());
 
   if (initial_path_) {
     load_image(*initial_path_);
@@ -102,6 +106,8 @@ int App::run() {
       ImGui_ImplSDL2_ProcessEvent(&event);
       process_event(event, running, request_open_dialog);
     }
+
+    update_ui_scale_if_needed();
 
     if (request_open_dialog) {
       if (const auto path = pixelscope::io::open_image_dialog()) {
@@ -151,6 +157,60 @@ void App::fit_image_to_canvas(float width, float height) {
   view_initialized_ = true;
 }
 
+float App::compute_ui_scale() const {
+  if (window_ == nullptr || renderer_ == nullptr) {
+    return 1.0f;
+  }
+
+  float pixel_ratio_scale = 1.0f;
+  int window_width = 0;
+  int window_height = 0;
+  int output_width = 0;
+  int output_height = 0;
+  SDL_GetWindowSize(window_, &window_width, &window_height);
+  if (SDL_GetRendererOutputSize(renderer_, &output_width, &output_height) == 0 &&
+      window_width > 0 && window_height > 0) {
+    const float scale_x = static_cast<float>(output_width) / static_cast<float>(window_width);
+    const float scale_y = static_cast<float>(output_height) / static_cast<float>(window_height);
+    pixel_ratio_scale = std::max(scale_x, scale_y);
+  }
+
+  float dpi_scale = 1.0f;
+  const int display_index = SDL_GetWindowDisplayIndex(window_);
+  if (display_index >= 0) {
+    float diagonal_dpi = 0.0f;
+    if (SDL_GetDisplayDPI(display_index, &diagonal_dpi, nullptr, nullptr) == 0 && diagonal_dpi > 0.0f) {
+      dpi_scale = diagonal_dpi / 96.0f;
+    }
+  }
+
+  return std::clamp(std::max(pixel_ratio_scale, dpi_scale), 1.0f, 3.0f);
+}
+
+void App::apply_ui_scale(float scale) {
+  ImGuiIO& io = ImGui::GetIO();
+  io.Fonts->Clear();
+
+  ImFontConfig font_config;
+  font_config.SizePixels = kBaseFontSize * scale;
+  io.Fonts->AddFontDefault(&font_config);
+
+  ImGuiStyle scaled_style = base_style_;
+  scaled_style.ScaleAllSizes(scale);
+  ImGui::GetStyle() = scaled_style;
+
+  ImGui_ImplSDLRenderer2_DestroyFontsTexture();
+  ImGui_ImplSDLRenderer2_CreateFontsTexture();
+  ui_scale_ = scale;
+}
+
+void App::update_ui_scale_if_needed() {
+  const float next_scale = compute_ui_scale();
+  if (std::fabs(next_scale - ui_scale_) > 0.05f) {
+    apply_ui_scale(next_scale);
+  }
+}
+
 void App::process_event(const SDL_Event& event, bool& running, bool& request_open_dialog) {
   if (event.type == SDL_QUIT) {
     running = false;
@@ -177,7 +237,7 @@ void App::draw_ui(bool& request_open_dialog) {
   draw_menu(request_open_dialog);
 
   const ImGuiViewport* viewport = ImGui::GetMainViewport();
-  const float status_bar_height = 28.0f;
+  const float status_bar_height = kBaseStatusBarHeight * ui_scale_;
   const float menu_height = ImGui::GetFrameHeight();
 
   ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x, viewport->WorkPos.y + menu_height));
