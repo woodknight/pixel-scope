@@ -33,6 +33,25 @@ pixelscope::core::Rect to_rect(const ImVec2& min, const ImVec2& size) {
 
 pixelscope::core::Vec2 to_vec2(const ImVec2& value) { return {.x = value.x, .y = value.y}; }
 
+const char* cfa_label(const pixelscope::core::ImageMetadata& metadata, int x, int y) {
+  if (!metadata.is_raw_bayer_plane) {
+    return "";
+  }
+
+  const int pattern_index = (y % 2) * 2 + (x % 2);
+  const int channel = metadata.cfa_pattern[static_cast<std::size_t>(pattern_index)];
+  if (channel == 0) {
+    return "R";
+  }
+  if (channel == 1) {
+    return "G";
+  }
+  if (channel == 2) {
+    return "B";
+  }
+  return "?";
+}
+
 void draw_pixel_grid_overlay(
     ImDrawList* draw_list,
     const pixelscope::core::Rect& image_bounds,
@@ -423,7 +442,7 @@ void App::draw_canvas() {
   draw_list->AddRectFilled(canvas_pos, ImVec2(canvas_pos.x + canvas_size.x, canvas_pos.y + canvas_size.y), IM_COL32(24, 26, 32, 255));
 
   if (!image_model_.valid()) {
-    const char* prompt = "Open a PNG or JPEG to inspect pixels.";
+    const char* prompt = "Open a PNG, JPEG, or DNG to inspect pixels.";
     const ImVec2 text_size = ImGui::CalcTextSize(prompt);
     draw_list->AddText(
         ImVec2(canvas_pos.x + (canvas_size.x - text_size.x) * 0.5f, canvas_pos.y + (canvas_size.y - text_size.y) * 0.5f),
@@ -493,7 +512,13 @@ void App::draw_canvas() {
       const int pixel_x = static_cast<int>(std::floor(image_point->x));
       const int pixel_y = static_cast<int>(std::floor(image_point->y));
       if (const auto pixel = source_image.pixel_at(pixel_x, pixel_y)) {
-        hover_ = {.x = pixel_x, .y = pixel_y, .pixel = *pixel, .active = true};
+        hover_ = {
+            .x = pixel_x,
+            .y = pixel_y,
+            .pixel = *pixel,
+            .raw_sample = source_image.raw_sample_at(pixel_x, pixel_y),
+            .active = true,
+        };
       } else {
         reset_hover();
       }
@@ -585,12 +610,21 @@ void App::draw_status_bar() {
     ImGui::TextDisabled("|");
     ImGui::SameLine();
     if (hover_.active) {
-      ImGui::Text("Pixel (%d, %d) RGB [%u, %u, %u]",
-          hover_.x,
-          hover_.y,
-          hover_.pixel.r,
-          hover_.pixel.g,
-          hover_.pixel.b);
+      if (source_image.metadata().is_raw_bayer_plane && hover_.raw_sample.has_value()) {
+        ImGui::Text("Pixel (%d, %d) %s RAW [%u] Gray [%u]",
+            hover_.x,
+            hover_.y,
+            cfa_label(source_image.metadata(), hover_.x, hover_.y),
+            hover_.raw_sample.value(),
+            hover_.pixel.r);
+      } else {
+        ImGui::Text("Pixel (%d, %d) RGB [%u, %u, %u]",
+            hover_.x,
+            hover_.y,
+            hover_.pixel.r,
+            hover_.pixel.g,
+            hover_.pixel.b);
+      }
     } else {
       ImGui::TextUnformatted("Pixel (-, -)");
     }

@@ -49,5 +49,5 @@ Open an image from the `File` menu, with `Ctrl+O`, or by passing a file path on 
 - Pixel inspection reads from the CPU image model, not the display texture.
 - Large images now build a small set of nearest-neighbor preview levels in `core/` so the first on-screen upload can use a reduced display texture while keeping the full-resolution source image for inspection.
 - Histogram computation is derived from the source `RGBA8` image model and rendered as a lightweight overlay in the UI.
-- DNG support currently converts the largest decoded 8-bit or 16-bit payload into an RGBA8 display image. Single-channel RAW payloads are shown as normalized grayscale as a Phase 1 fallback rather than a full RAW inspection workflow.
+- DNG support currently converts the largest decoded 8-bit or 16-bit payload into an RGBA8 display image. Single-channel Bayer payloads are shown as a grayscale raw plane without black/white normalization, and the status bar reports the untouched raw sample value.
 - TIFF, richer RAW controls, and metadata panels are still follow-up work.

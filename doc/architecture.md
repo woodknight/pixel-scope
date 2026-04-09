@@ -25,7 +25,8 @@ ImageData → RAW pipeline → Renderer → Screen
 
 - Source data:
   `core::ImageData` stores the loaded RGBA8 buffer plus source metadata.
-  DNG files are currently decoded in `io/` and normalized into this same RGBA8 truth path so the rest of the app can stay format-agnostic.
+  DNG files are currently decoded in `io/` and converted into this same RGBA8 truth path so the rest of the app can stay format-agnostic.
+  For single-channel Bayer DNGs, `core::ImageData` also carries the untouched raw sample plane so the UI can render a grayscale raw view while still reporting exact raw values.
 - Image model:
   `core::ImageModel` keeps the full-resolution source image plus a few nearest-neighbor downsampled display levels. The UI picks the smallest display level that still maps to roughly one screen pixel per texel, which avoids an expensive full-resolution texture upload during the initial fit-to-window view of very large images.
 - Derived inspection data:
@@ -40,6 +41,6 @@ ImageData → RAW pipeline → Renderer → Screen
 - Extend the histogram model to support log scale, clipping indicators, and view-vs-full-image modes.
 - Consider moving image decoding and preview generation off the UI thread so opening very large images does not stall input handling.
 - Add TIFF support behind the same `io/` interface.
-- Add a richer DNG/RAW model that preserves Bayer semantics instead of collapsing single-channel RAW data to grayscale for display.
+- Add a richer DNG/RAW model with explicit CFA metadata and raw-specific histogram modes.
 - Persist recent files and last window state.
 - Separate fit-to-window state from manual zoom state a bit more explicitly.

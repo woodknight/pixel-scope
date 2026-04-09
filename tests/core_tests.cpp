@@ -182,6 +182,8 @@ int main() {
     assert(model.display_levels[0].image.metadata().width == 8);
     assert(model.display_levels[1].downsample_factor == 4);
     assert(model.display_levels[1].image.metadata().width == 4);
+    assert(model.pick_display_level(1.0f) == nullptr);
+    assert(model.pick_display_level(2.0f) == nullptr);
     assert(model.pick_display_level(0.6f)->downsample_factor == 2);
     assert(model.pick_display_level(0.3f)->downsample_factor == 4);
     assert(model.pick_display_level(0.1f)->downsample_factor == 4);
@@ -190,26 +192,46 @@ int main() {
   {
     pixelscope::io::DngFrame frame{
         .width = 2,
-        .height = 1,
+        .height = 2,
         .samples_per_pixel = 1,
         .bits_per_sample = 16,
-        .black_levels = {64, 0, 0, 0},
-        .white_levels = {1087, -1, -1, -1},
+        .original_bits_per_sample = 10,
+        .cfa_pattern = {0, 1, 1, 2},
+        .black_levels = {0, 0, 0, 0},
+        .white_levels = {-1, -1, -1, -1},
         .decoded_bytes =
             {
                 64, 0,
-                87, 4,
+                255, 3,
+                128, 1,
+                0, 1,
             },
     };
     const auto image = pixelscope::io::rgba8_image_from_dng_frame(frame, "mono.dng");
     assert(image.valid());
-    assert(image.metadata().bits_per_channel == 16);
-    assert(image.pixel_at(0, 0)->r == 0);
-    assert(image.pixel_at(0, 0)->g == 0);
-    assert(image.pixel_at(0, 0)->b == 0);
+    assert(image.metadata().bits_per_channel == 10);
+    assert(image.metadata().is_raw_bayer_plane);
+    assert(image.metadata().cfa_pattern[0] == 0);
+    assert(image.metadata().cfa_pattern[1] == 1);
+    assert(image.metadata().cfa_pattern[2] == 1);
+    assert(image.metadata().cfa_pattern[3] == 2);
+    assert(image.has_raw_samples());
+    assert(image.raw_sample_at(0, 0).value() == 64);
+    assert(image.raw_sample_at(1, 0).value() == 1023);
+    assert(image.raw_sample_at(0, 1).value() == 384);
+    assert(image.raw_sample_at(1, 1).value() == 256);
+    assert(image.pixel_at(0, 0)->r == 16);
+    assert(image.pixel_at(0, 0)->g == 16);
+    assert(image.pixel_at(0, 0)->b == 16);
     assert(image.pixel_at(1, 0)->r == 255);
     assert(image.pixel_at(1, 0)->g == 255);
     assert(image.pixel_at(1, 0)->b == 255);
+    assert(image.pixel_at(0, 1)->r == 96);
+    assert(image.pixel_at(0, 1)->g == 96);
+    assert(image.pixel_at(0, 1)->b == 96);
+    assert(image.pixel_at(1, 1)->r == 64);
+    assert(image.pixel_at(1, 1)->g == 64);
+    assert(image.pixel_at(1, 1)->b == 64);
   }
 
   {
@@ -218,6 +240,7 @@ int main() {
         .height = 1,
         .samples_per_pixel = 3,
         .bits_per_sample = 16,
+        .original_bits_per_sample = 10,
         .black_levels = {0, 128, 64, 0},
         .white_levels = {1023, 1151, 1087, -1},
         .decoded_bytes =
@@ -229,6 +252,8 @@ int main() {
     };
     const auto image = pixelscope::io::rgba8_image_from_dng_frame(frame, "rgb.dng");
     assert(image.valid());
+    assert(!image.metadata().is_raw_bayer_plane);
+    assert(!image.has_raw_samples());
     const auto pixel = image.pixel_at(0, 0);
     assert(pixel.has_value());
     assert(pixel->r == 128);

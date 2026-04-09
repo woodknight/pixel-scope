@@ -2,6 +2,7 @@
 
 #include <SDL.h>
 
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <vector>
@@ -28,6 +29,7 @@ class App {
     int x = -1;
     int y = -1;
     pixelscope::core::PixelRgba8 pixel = {};
+    std::optional<std::uint16_t> raw_sample;
     bool active = false;
   };
 

@@ -38,6 +38,10 @@ const ImageLevel* ImageModel::pick_display_level(float zoom) const {
     return nullptr;
   }
 
+  if (zoom >= 1.0f) {
+    return nullptr;
+  }
+
   const ImageLevel* fallback = &display_levels.back();
   for (const auto& level : display_levels) {
     if (zoom * static_cast<float>(level.downsample_factor) >= 1.0f) {

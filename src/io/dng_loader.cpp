@@ -44,6 +44,15 @@ int resolve_white_level(const DngFrame& frame, int channel) {
   return fallback_white_level(frame.bits_per_sample);
 }
 
+std::uint8_t raw_plane_to_u8(std::uint32_t sample, int original_bits_per_sample) {
+  const int bits = std::max(1, original_bits_per_sample);
+  if (bits <= 8) {
+    return static_cast<std::uint8_t>(std::min<std::uint32_t>(sample, 255));
+  }
+  const int shift = bits - 8;
+  return static_cast<std::uint8_t>(std::min<std::uint32_t>(sample >> shift, 255));
+}
+
 std::uint8_t normalize_to_u8(std::uint32_t sample, int black_level, int white_level) {
   const int clamped_black = std::max(0, black_level);
   const int clamped_white = std::max(clamped_black + 1, white_level);
@@ -89,6 +98,15 @@ DngFrame to_frame(const tinydng::DNGImage& image) {
   frame.height = image.height;
   frame.samples_per_pixel = image.samples_per_pixel;
   frame.bits_per_sample = image.bits_per_sample;
+  frame.original_bits_per_sample = image.bits_per_sample_original > 0
+                                       ? image.bits_per_sample_original
+                                       : image.bits_per_sample;
+  frame.cfa_pattern = {
+      image.cfa_pattern[0][0],
+      image.cfa_pattern[0][1],
+      image.cfa_pattern[1][0],
+      image.cfa_pattern[1][1],
+  };
   frame.decoded_bytes = image.data;
   for (int channel = 0; channel < 4; ++channel) {
     frame.black_levels[static_cast<std::size_t>(channel)] = image.black_level[channel];
@@ -130,16 +148,19 @@ pixelscope::core::ImageData rgba8_image_from_dng_frame(
   }
 
   std::vector<std::uint8_t> rgba_pixels(static_cast<std::size_t>(frame.width * frame.height * 4), 255);
+  std::vector<std::uint16_t> raw_samples;
   const std::size_t pixel_count = static_cast<std::size_t>(frame.width) * static_cast<std::size_t>(frame.height);
+  if (frame.samples_per_pixel == 1) {
+    raw_samples.reserve(pixel_count);
+  }
   for (std::size_t pixel_index = 0; pixel_index < pixel_count; ++pixel_index) {
     const std::size_t source_base = pixel_index * static_cast<std::size_t>(frame.samples_per_pixel);
     const std::size_t output_base = pixel_index * 4;
 
     if (frame.samples_per_pixel == 1) {
-      const auto value = normalize_to_u8(
-          read_frame_sample(frame, source_base),
-          frame.black_levels[0],
-          resolve_white_level(frame, 0));
+      const auto raw_sample = static_cast<std::uint16_t>(read_frame_sample(frame, source_base));
+      raw_samples.push_back(raw_sample);
+      const auto value = raw_plane_to_u8(raw_sample, frame.original_bits_per_sample);
       rgba_pixels[output_base + 0] = value;
       rgba_pixels[output_base + 1] = value;
       rgba_pixels[output_base + 2] = value;
@@ -165,10 +186,12 @@ pixelscope::core::ImageData rgba8_image_from_dng_frame(
       .width = frame.width,
       .height = frame.height,
       .original_channel_count = frame.samples_per_pixel,
-      .bits_per_channel = frame.bits_per_sample,
+      .bits_per_channel = frame.original_bits_per_sample > 0 ? frame.original_bits_per_sample : frame.bits_per_sample,
+      .is_raw_bayer_plane = frame.samples_per_pixel == 1,
+      .cfa_pattern = frame.cfa_pattern,
       .source_path = source_path,
   };
-  return pixelscope::core::ImageData(std::move(metadata), std::move(rgba_pixels));
+  return pixelscope::core::ImageData(std::move(metadata), std::move(rgba_pixels), std::move(raw_samples));
 }
 
 DngLoadResult load_dng_file(const std::string& path) {
