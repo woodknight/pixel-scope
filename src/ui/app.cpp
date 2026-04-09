@@ -188,6 +188,7 @@ float App::compute_ui_scale() const {
     return 1.0f;
   }
 
+  const float renderer_scale = compute_renderer_scale();
   float dpi_scale = 1.0f;
   const int display_index = SDL_GetWindowDisplayIndex(window_);
   if (display_index >= 0) {
@@ -197,7 +198,8 @@ float App::compute_ui_scale() const {
     }
   }
 
-  return std::clamp(std::max(compute_renderer_scale(), dpi_scale), 1.0f, 3.0f);
+  const float adjusted_scale = dpi_scale / std::max(1.0f, renderer_scale);
+  return std::clamp(adjusted_scale, 1.0f, 2.0f);
 }
 
 std::vector<std::string> App::preferred_font_paths() const {
