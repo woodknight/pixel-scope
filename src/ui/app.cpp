@@ -270,19 +270,26 @@ void App::draw_ui(bool& request_open_dialog) {
   const ImGuiViewport* viewport = ImGui::GetMainViewport();
   const float status_bar_height = kBaseStatusBarHeight * ui_scale_;
   const float menu_height = ImGui::GetFrameHeight();
+  const ImVec2 viewport_pos = viewport->Pos;
+  const ImVec2 viewport_size = viewport->Size;
+  const float canvas_height = std::max(0.0f, viewport_size.y - menu_height - status_bar_height);
 
-  ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x, viewport->WorkPos.y + menu_height));
-  ImGui::SetNextWindowSize(ImVec2(viewport->WorkSize.x, viewport->WorkSize.y - menu_height - status_bar_height));
+  ImGui::SetNextWindowPos(ImVec2(viewport_pos.x, viewport_pos.y + menu_height));
+  ImGui::SetNextWindowSize(ImVec2(viewport_size.x, canvas_height));
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
   ImGuiWindowFlags canvas_flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
-                                  ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoBringToFrontOnFocus;
+                                  ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoBringToFrontOnFocus |
+                                  ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
   ImGui::Begin("CanvasHost", nullptr, canvas_flags);
+  ImGui::PopStyleVar();
   draw_canvas();
   ImGui::End();
 
-  ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x, viewport->WorkPos.y + viewport->WorkSize.y - status_bar_height));
-  ImGui::SetNextWindowSize(ImVec2(viewport->WorkSize.x, status_bar_height));
+  ImGui::SetNextWindowPos(ImVec2(viewport_pos.x, viewport_pos.y + menu_height + canvas_height));
+  ImGui::SetNextWindowSize(ImVec2(viewport_size.x, status_bar_height));
   ImGuiWindowFlags status_flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
-                                  ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoBringToFrontOnFocus;
+                                  ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoBringToFrontOnFocus |
+                                  ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
   ImGui::Begin("StatusBar", nullptr, status_flags);
   draw_status_bar();
   ImGui::End();
@@ -309,7 +316,9 @@ void App::draw_menu(bool& request_open_dialog) {
   if (ImGui::BeginMenu("View")) {
     const bool has_image = image_.valid();
     if (ImGui::MenuItem("Fit to Window", nullptr, false, has_image)) {
-      fit_image_to_canvas(ImGui::GetMainViewport()->WorkSize.x, ImGui::GetMainViewport()->WorkSize.y);
+      fit_image_to_canvas(
+          ImGui::GetMainViewport()->Size.x,
+          ImGui::GetMainViewport()->Size.y - ImGui::GetFrameHeight() - (kBaseStatusBarHeight * ui_scale_));
     }
     if (ImGui::MenuItem("1:1 Zoom", nullptr, false, has_image)) {
       view_.zoom = 1.0f;
