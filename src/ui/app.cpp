@@ -359,7 +359,7 @@ void App::draw_canvas() {
   }
 
   const bool hovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
-  if (hovered && !ImGui::GetIO().WantCaptureMouse) {
+  if (hovered) {
     if (ImGui::IsMouseDragging(ImGuiMouseButton_Left, 0.0f)) {
       const ImVec2 delta = ImGui::GetIO().MouseDelta;
       view_.pan.x += delta.x;
@@ -415,13 +415,12 @@ void App::draw_status_bar() {
     ImGui::TextDisabled("|");
     ImGui::SameLine();
     if (hover_.active) {
-      ImGui::Text("Pixel (%d, %d) RGBA [%u, %u, %u, %u]",
+      ImGui::Text("Pixel (%d, %d) RGB [%u, %u, %u]",
           hover_.x,
           hover_.y,
           hover_.pixel.r,
           hover_.pixel.g,
-          hover_.pixel.b,
-          hover_.pixel.a);
+          hover_.pixel.b);
     } else {
       ImGui::TextUnformatted("Pixel (-, -)");
     }
