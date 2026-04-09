@@ -51,6 +51,7 @@ class App {
   pixelscope::core::ImageData image_;
   pixelscope::core::ViewState view_;
   bool view_initialized_ = false;
+  int open_dialog_delay_frames_ = 0;
   float renderer_scale_ = 1.0f;
   float ui_scale_ = 1.0f;
   ImGuiStyle base_style_ = {};

@@ -102,33 +102,43 @@ int App::run() {
 
   bool running = true;
   while (running) {
-    bool request_open_dialog = false;
     SDL_Event event;
     while (SDL_PollEvent(&event) != 0) {
       ImGui_ImplSDL2_ProcessEvent(&event);
+      bool request_open_dialog = false;
       process_event(event, running, request_open_dialog);
+      if (request_open_dialog) {
+        open_dialog_delay_frames_ = 2;
+      }
     }
 
     update_renderer_scale();
     update_ui_scale_if_needed();
 
-    if (request_open_dialog) {
-      if (const auto path = pixelscope::io::open_image_dialog()) {
-        load_image(*path);
-      }
-    }
-
     ImGui_ImplSDLRenderer2_NewFrame();
     ImGui_ImplSDL2_NewFrame();
     ImGui::NewFrame();
 
+    bool request_open_dialog = false;
     draw_ui(request_open_dialog);
+    if (request_open_dialog) {
+      open_dialog_delay_frames_ = 2;
+    }
 
     ImGui::Render();
     SDL_SetRenderDrawColor(renderer_, 18, 20, 24, 255);
     SDL_RenderClear(renderer_);
     ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(), renderer_);
     SDL_RenderPresent(renderer_);
+
+    if (open_dialog_delay_frames_ > 0) {
+      --open_dialog_delay_frames_;
+      if (open_dialog_delay_frames_ == 0) {
+        if (const auto path = pixelscope::io::open_image_dialog()) {
+          load_image(*path);
+        }
+      }
+    }
   }
 
   return 0;
