@@ -5,6 +5,8 @@ project(PixelScope VERSION 0.1.0 LANGUAGES CXX C)
 include(FetchContent)
 include(CTest)
 
+find_package(TIFF REQUIRED)
+
 if(POLICY CMP0169)
   cmake_policy(SET CMP0169 OLD)
 endif()
@@ -84,6 +86,7 @@ add_library(pixelscope_core STATIC
   src/io/dng_loader.cpp
   src/io/file_dialog.cpp
   src/io/image_loader.cpp
+  src/io/tiff_loader.cpp
   src/render/texture_cache.cpp
   src/ui/app.cpp
 )
@@ -92,7 +95,7 @@ target_include_directories(pixelscope_core PUBLIC
   ${stb_SOURCE_DIR}
   ${tinydng_SOURCE_DIR}
 )
-target_link_libraries(pixelscope_core PUBLIC SDL2::SDL2 imgui_lib tinyfiledialogs_lib)
+target_link_libraries(pixelscope_core PUBLIC SDL2::SDL2 imgui_lib tinyfiledialogs_lib TIFF::TIFF)
 
 add_executable(pixelscope src/main.cpp)
 target_link_libraries(pixelscope PRIVATE pixelscope_core)

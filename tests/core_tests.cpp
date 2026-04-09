@@ -1,6 +1,7 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
+#include <string>
 #include <vector>
 
 #include "core/histogram.h"
@@ -8,8 +9,29 @@
 #include "core/image_model.h"
 #include "core/viewport.h"
 #include "io/dng_loader.h"
+#include "io/image_loader.h"
 
 int main() {
+  {
+    const auto image = pixelscope::io::load_image_file("../images/DeltaE_8bit_gamma1.0.tif");
+    assert(image.ok());
+    assert(image.image.valid());
+    assert(image.image.metadata().width == 3072);
+    assert(image.image.metadata().height == 2048);
+    assert(image.image.metadata().bits_per_channel == 8);
+    assert(image.image.metadata().original_channel_count == 3);
+  }
+
+  {
+    const auto image = pixelscope::io::load_image_file("../images/DeltaE_16bit_gamma1.0.tif");
+    assert(image.ok());
+    assert(image.image.valid());
+    assert(image.image.metadata().width == 3072);
+    assert(image.image.metadata().height == 2048);
+    assert(image.image.metadata().bits_per_channel == 16);
+    assert(image.image.metadata().original_channel_count == 3);
+  }
+
   {
     pixelscope::core::ImageMetadata metadata{
         .width = 2,

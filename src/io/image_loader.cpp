@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "io/dng_loader.h"
+#include "io/tiff_loader.h"
 
 namespace pixelscope::io {
 
@@ -24,28 +25,39 @@ bool is_supported_extension(const std::string& path) {
   std::transform(extension.begin(), extension.end(), extension.begin(), [](unsigned char c) {
     return static_cast<char>(std::tolower(c));
   });
-  return extension == ".png" || extension == ".jpg" || extension == ".jpeg" || extension == ".dng";
+  return extension == ".png" || extension == ".jpg" || extension == ".jpeg" || extension == ".tif" ||
+         extension == ".tiff" || extension == ".dng";
+}
+
+std::string normalized_extension(const std::string& path) {
+  const auto last_dot = path.find_last_of('.');
+  if (last_dot == std::string::npos) {
+    return {};
+  }
+
+  std::string extension = path.substr(last_dot);
+  std::transform(extension.begin(), extension.end(), extension.begin(), [](unsigned char c) {
+    return static_cast<char>(std::tolower(c));
+  });
+  return extension;
 }
 
 }  // namespace
 
 LoadImageResult load_image_file(const std::string& path) {
-  const auto last_dot = path.find_last_of('.');
-  std::string extension;
-  if (last_dot != std::string::npos) {
-    extension = path.substr(last_dot);
-    std::transform(extension.begin(), extension.end(), extension.begin(), [](unsigned char c) {
-      return static_cast<char>(std::tolower(c));
-    });
-  }
+  const std::string extension = normalized_extension(path);
 
   if (!is_supported_extension(path)) {
-    return {.error_message = "Only PNG, JPEG, and DNG are supported in this phase."};
+    return {.error_message = "Only PNG, JPEG, TIFF, and DNG are supported in this phase."};
   }
 
   if (extension == ".dng") {
     auto dng_result = load_dng_file(path);
     return {.image = std::move(dng_result.image), .error_message = std::move(dng_result.error_message)};
+  }
+
+  if (extension == ".tif" || extension == ".tiff") {
+    return load_tiff_file(path);
   }
 
   int width = 0;
