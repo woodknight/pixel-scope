@@ -29,6 +29,7 @@ class App {
     int x = -1;
     int y = -1;
     pixelscope::core::PixelRgba8 pixel = {};
+    std::optional<pixelscope::core::PixelRgba16> pixel16;
     std::optional<std::uint16_t> raw_sample;
     bool active = false;
   };

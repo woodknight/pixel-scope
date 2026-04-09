@@ -1,27 +1,65 @@
 #include "io/dng_loader.h"
 
-#define TINY_DNG_LOADER_IMPLEMENTATION
-#define TINY_DNG_LOADER_NO_STB_IMAGE_INCLUDE
-#include <tiny_dng_loader.h>
-
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
+#include <filesystem>
+#include <fstream>
 #include <limits>
+#include <sstream>
 #include <string>
+#include <system_error>
 #include <utility>
 #include <vector>
+
+#ifndef PIXELSCOPE_RAWLOADER_BRIDGE_PATH
+#define PIXELSCOPE_RAWLOADER_BRIDGE_PATH "rawloader_bridge"
+#endif
 
 namespace pixelscope::io {
 
 namespace {
 
+constexpr std::array<char, 8> kRawloaderMagic = {'P', 'S', 'R', 'D', 'N', 'G', '1', '\0'};
+
 template <typename T>
 T read_sample(const std::vector<std::uint8_t>& bytes, std::size_t offset) {
   T value{};
   std::memcpy(&value, bytes.data() + offset, sizeof(T));
+  return value;
+}
+
+template <typename T>
+bool read_value(std::ifstream& stream, T& value) {
+  stream.read(reinterpret_cast<char*>(&value), sizeof(T));
+  return stream.good();
+}
+
+std::uint16_t read_u16_le(std::ifstream& stream, bool& ok) {
+  std::uint16_t value = 0;
+  ok = read_value(stream, value);
+  return value;
+}
+
+std::uint32_t read_u32_le(std::ifstream& stream, bool& ok) {
+  std::uint32_t value = 0;
+  ok = read_value(stream, value);
+  return value;
+}
+
+std::uint64_t read_u64_le(std::ifstream& stream, bool& ok) {
+  std::uint64_t value = 0;
+  ok = read_value(stream, value);
+  return value;
+}
+
+std::int32_t read_i32_le(std::ifstream& stream, bool& ok) {
+  std::int32_t value = 0;
+  ok = read_value(stream, value);
   return value;
 }
 
@@ -41,7 +79,8 @@ int resolve_white_level(const DngFrame& frame, int channel) {
   if (explicit_white > frame.black_levels[clamped_channel]) {
     return explicit_white;
   }
-  return fallback_white_level(frame.bits_per_sample);
+  return fallback_white_level(frame.original_bits_per_sample > 0 ? frame.original_bits_per_sample
+                                                                 : frame.bits_per_sample);
 }
 
 std::uint8_t raw_plane_to_u8(std::uint32_t sample, int original_bits_per_sample) {
@@ -111,50 +150,181 @@ std::uint32_t read_frame_sample(const DngFrame& frame, std::size_t sample_index)
   return read_sample<std::uint16_t>(frame.decoded_bytes, byte_offset);
 }
 
-DngFrame to_frame(const tinydng::DNGImage& image) {
-  DngFrame frame;
-  frame.width = image.width;
-  frame.height = image.height;
-  frame.samples_per_pixel = image.samples_per_pixel;
-  frame.bits_per_sample = image.bits_per_sample;
-  frame.original_bits_per_sample = image.bits_per_sample_original > 0
-                                       ? image.bits_per_sample_original
-                                       : image.bits_per_sample;
-  frame.cfa_pattern = {
-      image.cfa_pattern[0][0],
-      image.cfa_pattern[0][1],
-      image.cfa_pattern[1][0],
-      image.cfa_pattern[1][1],
-  };
-  frame.decoded_bytes = image.data;
-  for (int channel = 0; channel < 4; ++channel) {
-    frame.black_levels[static_cast<std::size_t>(channel)] = image.black_level[channel];
-    frame.white_levels[static_cast<std::size_t>(channel)] = image.white_level[channel];
+std::filesystem::path temp_output_path(const char* suffix) {
+  namespace fs = std::filesystem;
+
+  std::error_code error_code;
+  fs::path directory = fs::temp_directory_path(error_code);
+  if (error_code) {
+    directory = fs::current_path(error_code);
   }
-  return frame;
+  if (directory.empty()) {
+    directory = ".";
+  }
+
+  const auto timestamp = std::chrono::steady_clock::now().time_since_epoch().count();
+  for (int attempt = 0; attempt < 64; ++attempt) {
+    const auto candidate = directory /
+                           ("pixelscope_rawloader_" + std::to_string(timestamp) + "_" +
+                            std::to_string(attempt) + suffix);
+    if (!fs::exists(candidate, error_code)) {
+      return candidate;
+    }
+  }
+  return directory / ("pixelscope_rawloader_fallback" + std::string(suffix));
 }
 
-const tinydng::DNGImage* pick_primary_image(const std::vector<tinydng::DNGImage>& images) {
-  const tinydng::DNGImage* best = nullptr;
-  std::size_t best_area = 0;
-  for (const auto& image : images) {
-    if (image.data.empty()) {
-      continue;
-    }
-    if (image.samples_per_pixel != 1 && image.samples_per_pixel != 3 && image.samples_per_pixel != 4) {
-      continue;
-    }
-    if (image.bits_per_sample != 8 && image.bits_per_sample != 16) {
-      continue;
-    }
-
-    const std::size_t area = static_cast<std::size_t>(image.width) * static_cast<std::size_t>(image.height);
-    if (best == nullptr || area > best_area) {
-      best = &image;
-      best_area = area;
+std::string shell_quote(const std::string& value) {
+#ifdef _WIN32
+  std::string quoted = "\"";
+  for (char c : value) {
+    if (c == '"') {
+      quoted += "\\\"";
+    } else {
+      quoted += c;
     }
   }
-  return best;
+  quoted += "\"";
+  return quoted;
+#else
+  std::string quoted = "'";
+  for (char c : value) {
+    if (c == '\'') {
+      quoted += "'\"'\"'";
+    } else {
+      quoted += c;
+    }
+  }
+  quoted += "'";
+  return quoted;
+#endif
+}
+
+struct ScopedFileCleanup {
+  std::filesystem::path path;
+
+  ~ScopedFileCleanup() {
+    if (!path.empty()) {
+      std::error_code error_code;
+      std::filesystem::remove(path, error_code);
+    }
+  }
+};
+
+bool run_rawloader_bridge(
+    const std::string& input_path,
+    const std::filesystem::path& output_path,
+    const std::filesystem::path& error_path,
+    std::string& error_message) {
+  const std::string command = shell_quote(PIXELSCOPE_RAWLOADER_BRIDGE_PATH) + " " +
+                              shell_quote(input_path) + " " +
+                              shell_quote(output_path.string()) + " 2> " +
+                              shell_quote(error_path.string());
+  const int exit_code = std::system(command.c_str());
+  if (exit_code == 0) {
+    return true;
+  }
+
+  std::ifstream error_stream(error_path);
+  if (error_stream.good()) {
+    std::ostringstream buffer;
+    buffer << error_stream.rdbuf();
+    error_message = buffer.str();
+  }
+  if (error_message.empty()) {
+    error_message = "rawloader bridge failed to decode the DNG file.";
+  }
+  while (!error_message.empty() &&
+         (error_message.back() == '\n' || error_message.back() == '\r')) {
+    error_message.pop_back();
+  }
+  return false;
+}
+
+bool load_frame_from_payload(const std::filesystem::path& payload_path, DngFrame& frame, std::string& error_message) {
+  std::ifstream stream(payload_path, std::ios::binary);
+  if (!stream.is_open()) {
+    error_message = "PixelScope could not read the rawloader payload.";
+    return false;
+  }
+
+  std::array<char, 8> magic{};
+  stream.read(magic.data(), static_cast<std::streamsize>(magic.size()));
+  if (stream.gcount() != static_cast<std::streamsize>(magic.size()) || magic != kRawloaderMagic) {
+    error_message = "PixelScope received an invalid rawloader payload header.";
+    return false;
+  }
+
+  bool ok = true;
+  const auto version = read_u32_le(stream, ok);
+  if (!ok || version != 1) {
+    error_message = "PixelScope received an unsupported rawloader payload version.";
+    return false;
+  }
+
+  frame.width = static_cast<int>(read_u32_le(stream, ok));
+  if (!ok) {
+    error_message = "PixelScope could not read the rawloader payload dimensions.";
+    return false;
+  }
+  frame.height = static_cast<int>(read_u32_le(stream, ok));
+  frame.samples_per_pixel = static_cast<int>(read_u32_le(stream, ok));
+  frame.bits_per_sample = static_cast<int>(read_u32_le(stream, ok));
+  frame.original_bits_per_sample = static_cast<int>(read_u32_le(stream, ok));
+  if (!ok) {
+    error_message = "PixelScope could not read the rawloader payload metadata.";
+    return false;
+  }
+
+  for (auto& value : frame.cfa_pattern) {
+    value = static_cast<int>(read_i32_le(stream, ok));
+  }
+  for (auto& value : frame.black_levels) {
+    value = static_cast<int>(read_u16_le(stream, ok));
+  }
+  for (auto& value : frame.white_levels) {
+    value = static_cast<int>(read_u16_le(stream, ok));
+  }
+  if (!ok) {
+    error_message = "PixelScope could not read the rawloader payload levels.";
+    return false;
+  }
+
+  const auto sample_count = read_u64_le(stream, ok);
+  if (!ok) {
+    error_message = "PixelScope could not read the rawloader payload sample count.";
+    return false;
+  }
+
+  const std::size_t byte_count = static_cast<std::size_t>(sample_count) * sizeof(std::uint16_t);
+  frame.decoded_bytes.resize(byte_count);
+  if (!frame.decoded_bytes.empty()) {
+    stream.read(reinterpret_cast<char*>(frame.decoded_bytes.data()), static_cast<std::streamsize>(byte_count));
+    if (stream.gcount() != static_cast<std::streamsize>(byte_count)) {
+      error_message = "PixelScope could not read the rawloader sample buffer.";
+      return false;
+    }
+  }
+
+  return true;
+}
+
+bool load_frame_with_rawloader(const std::string& input_path, DngFrame& frame, std::string& error_message) {
+  const auto payload_path = temp_output_path(".bin");
+  const auto stderr_path = temp_output_path(".log");
+  ScopedFileCleanup payload_cleanup{payload_path};
+  ScopedFileCleanup stderr_cleanup{stderr_path};
+
+  if (!std::filesystem::exists(PIXELSCOPE_RAWLOADER_BRIDGE_PATH)) {
+    error_message = "rawloader bridge binary is missing from the build output.";
+    return false;
+  }
+
+  if (!run_rawloader_bridge(input_path, payload_path, stderr_path, error_message)) {
+    return false;
+  }
+
+  return load_frame_from_payload(payload_path, frame, error_message);
 }
 
 }  // namespace
@@ -168,9 +338,12 @@ pixelscope::core::ImageData rgba8_image_from_dng_frame(
 
   std::vector<std::uint8_t> rgba_pixels(static_cast<std::size_t>(frame.width * frame.height * 4), 255);
   std::vector<std::uint16_t> raw_samples;
+  std::vector<std::uint16_t> rgba16_pixels;
   const std::size_t pixel_count = static_cast<std::size_t>(frame.width) * static_cast<std::size_t>(frame.height);
   if (frame.samples_per_pixel == 1) {
     raw_samples.reserve(pixel_count);
+  } else if ((frame.original_bits_per_sample > 8 || frame.bits_per_sample > 8)) {
+    rgba16_pixels.resize(pixel_count * 4, std::numeric_limits<std::uint16_t>::max());
   }
   for (std::size_t pixel_index = 0; pixel_index < pixel_count; ++pixel_index) {
     const std::size_t source_base = pixel_index * static_cast<std::size_t>(frame.samples_per_pixel);
@@ -190,17 +363,25 @@ pixelscope::core::ImageData rgba8_image_from_dng_frame(
     }
 
     for (int channel = 0; channel < 3; ++channel) {
+      const auto sample = read_frame_sample(frame, source_base + static_cast<std::size_t>(channel));
       rgba_pixels[output_base + static_cast<std::size_t>(channel)] = normalize_to_u8(
-          read_frame_sample(frame, source_base + static_cast<std::size_t>(channel)),
+          sample,
           frame.black_levels[static_cast<std::size_t>(channel)],
           resolve_white_level(frame, channel));
+      if (!rgba16_pixels.empty()) {
+        rgba16_pixels[output_base + static_cast<std::size_t>(channel)] = static_cast<std::uint16_t>(sample);
+      }
     }
 
     if (frame.samples_per_pixel == 4) {
+      const auto alpha_sample = read_frame_sample(frame, source_base + 3);
       rgba_pixels[output_base + 3] = normalize_to_u8(
-          read_frame_sample(frame, source_base + 3),
+          alpha_sample,
           frame.black_levels[3],
           resolve_white_level(frame, 3));
+      if (!rgba16_pixels.empty()) {
+        rgba16_pixels[output_base + 3] = static_cast<std::uint16_t>(alpha_sample);
+      }
     }
   }
 
@@ -213,7 +394,11 @@ pixelscope::core::ImageData rgba8_image_from_dng_frame(
       .cfa_pattern = frame.cfa_pattern,
       .source_path = source_path,
   };
-  return pixelscope::core::ImageData(std::move(metadata), std::move(rgba_pixels), std::move(raw_samples));
+  return pixelscope::core::ImageData(
+      std::move(metadata),
+      std::move(rgba_pixels),
+      std::move(raw_samples),
+      std::move(rgba16_pixels));
 }
 
 pixelscope::core::ImageData render_raw_bayer_image(
@@ -249,25 +434,18 @@ pixelscope::core::ImageData render_raw_bayer_image(
 }
 
 DngLoadResult load_dng_file(const std::string& path) {
-  std::vector<tinydng::FieldInfo> custom_fields;
-  std::vector<tinydng::DNGImage> images;
-  std::string warning_message;
+  DngFrame frame;
   std::string error_message;
-  if (!tinydng::LoadDNG(path.c_str(), custom_fields, &images, &warning_message, &error_message)) {
-    if (!error_message.empty()) {
-      return {.error_message = error_message};
+  if (!load_frame_with_rawloader(path, frame, error_message)) {
+    if (error_message.empty()) {
+      error_message = "Failed to decode DNG image with rawloader.";
     }
-    return {.error_message = "Failed to decode DNG image."};
+    return {.error_message = std::move(error_message)};
   }
 
-  const tinydng::DNGImage* primary_image = pick_primary_image(images);
-  if (primary_image == nullptr) {
-    return {.error_message = "No supported 8-bit or 16-bit DNG image payload was found."};
-  }
-
-  auto image = rgba8_image_from_dng_frame(to_frame(*primary_image), path);
+  auto image = rgba8_image_from_dng_frame(frame, path);
   if (!image.valid()) {
-    return {.error_message = "DNG decode succeeded, but PixelScope could not convert the image to RGBA8."};
+    return {.error_message = "rawloader decode succeeded, but PixelScope could not convert the image to RGBA8."};
   }
 
   return {.image = std::move(image)};

@@ -36,22 +36,12 @@ FetchContent_Declare(
 )
 
 FetchContent_Declare(
-  tinydng
-  GIT_REPOSITORY https://github.com/syoyo/tinydng.git
-  GIT_TAG f3b42f5bb1a3151036115f84ceabe2187e023243
-)
-
-FetchContent_Declare(
   tinyfiledialogs
   GIT_REPOSITORY https://github.com/native-toolkit/libtinyfiledialogs.git
   GIT_TAG master
 )
 
 FetchContent_MakeAvailable(sdl2 imgui stb tinyfiledialogs)
-FetchContent_GetProperties(tinydng)
-if(NOT tinydng_POPULATED)
-  FetchContent_Populate(tinydng)
-endif()
 
 add_library(imgui_lib STATIC
   ${imgui_SOURCE_DIR}/imgui.cpp
@@ -78,6 +68,52 @@ elseif(UNIX AND NOT APPLE)
   target_link_libraries(tinyfiledialogs_lib PUBLIC dl)
 endif()
 
+execute_process(
+  COMMAND rustup which cargo
+  OUTPUT_VARIABLE RAWLOADER_CARGO_EXECUTABLE
+  OUTPUT_STRIP_TRAILING_WHITESPACE
+  ERROR_QUIET
+  RESULT_VARIABLE RAWLOADER_CARGO_RESULT
+)
+if(NOT RAWLOADER_CARGO_RESULT EQUAL 0 OR RAWLOADER_CARGO_EXECUTABLE STREQUAL "")
+  find_program(RAWLOADER_CARGO_EXECUTABLE cargo REQUIRED)
+endif()
+
+execute_process(
+  COMMAND rustup which rustc
+  OUTPUT_VARIABLE RAWLOADER_RUSTC_EXECUTABLE
+  OUTPUT_STRIP_TRAILING_WHITESPACE
+  ERROR_QUIET
+  RESULT_VARIABLE RAWLOADER_RUSTC_RESULT
+)
+if(NOT RAWLOADER_RUSTC_RESULT EQUAL 0 OR RAWLOADER_RUSTC_EXECUTABLE STREQUAL "")
+  find_program(RAWLOADER_RUSTC_EXECUTABLE rustc REQUIRED)
+endif()
+
+get_filename_component(RAWLOADER_RUST_BIN_DIR "${RAWLOADER_RUSTC_EXECUTABLE}" DIRECTORY)
+set(RAWLOADER_BRIDGE_TARGET_DIR "${CMAKE_CURRENT_BINARY_DIR}/rawloader_bridge-target")
+set(RAWLOADER_BRIDGE_EXECUTABLE
+    "${RAWLOADER_BRIDGE_TARGET_DIR}/release/rawloader_bridge${CMAKE_EXECUTABLE_SUFFIX}")
+
+add_custom_command(
+  OUTPUT "${RAWLOADER_BRIDGE_EXECUTABLE}"
+  COMMAND
+    ${CMAKE_COMMAND} -E env
+    "PATH=${RAWLOADER_RUST_BIN_DIR}:$ENV{PATH}"
+    "RUSTC=${RAWLOADER_RUSTC_EXECUTABLE}"
+    "CARGO_TARGET_DIR=${RAWLOADER_BRIDGE_TARGET_DIR}"
+    "${RAWLOADER_CARGO_EXECUTABLE}" build --manifest-path
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/rawloader_bridge/Cargo.toml" --release
+  DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/rawloader_bridge/Cargo.toml"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/rawloader_bridge/src/main.rs"
+  WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+  COMMENT "Building rawloader bridge"
+  VERBATIM
+)
+
+add_custom_target(rawloader_bridge_build DEPENDS "${RAWLOADER_BRIDGE_EXECUTABLE}")
+
 add_library(pixelscope_core STATIC
   src/core/histogram.cpp
   src/core/image.cpp
@@ -93,9 +129,13 @@ add_library(pixelscope_core STATIC
 target_include_directories(pixelscope_core PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/src
   ${stb_SOURCE_DIR}
-  ${tinydng_SOURCE_DIR}
+)
+target_compile_definitions(
+  pixelscope_core
+  PRIVATE PIXELSCOPE_RAWLOADER_BRIDGE_PATH="${RAWLOADER_BRIDGE_EXECUTABLE}"
 )
 target_link_libraries(pixelscope_core PUBLIC SDL2::SDL2 imgui_lib tinyfiledialogs_lib TIFF::TIFF)
+add_dependencies(pixelscope_core rawloader_bridge_build)
 
 add_executable(pixelscope src/main.cpp)
 target_link_libraries(pixelscope PRIVATE pixelscope_core)

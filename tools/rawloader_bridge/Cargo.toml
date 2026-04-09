@@ -1,0 +1,7 @@
+[package]
+name = "rawloader_bridge"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rawloader = "0.37.1"
