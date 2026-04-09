@@ -53,6 +53,25 @@ std::uint8_t raw_plane_to_u8(std::uint32_t sample, int original_bits_per_sample)
   return static_cast<std::uint8_t>(std::min<std::uint32_t>(sample >> shift, 255));
 }
 
+pixelscope::core::PixelRgba8 cfa_mosaic_pixel(
+    std::uint8_t value,
+    const std::array<int, 4>& cfa_pattern,
+    int x,
+    int y) {
+  const int pattern_index = (y % 2) * 2 + (x % 2);
+  const int channel = cfa_pattern[static_cast<std::size_t>(pattern_index)];
+  if (channel == 0) {
+    return {.r = value, .g = 0, .b = 0, .a = 255};
+  }
+  if (channel == 1) {
+    return {.r = 0, .g = value, .b = 0, .a = 255};
+  }
+  if (channel == 2) {
+    return {.r = 0, .g = 0, .b = value, .a = 255};
+  }
+  return {.r = value, .g = value, .b = value, .a = 255};
+}
+
 std::uint8_t normalize_to_u8(std::uint32_t sample, int black_level, int white_level) {
   const int clamped_black = std::max(0, black_level);
   const int clamped_white = std::max(clamped_black + 1, white_level);
@@ -156,14 +175,17 @@ pixelscope::core::ImageData rgba8_image_from_dng_frame(
   for (std::size_t pixel_index = 0; pixel_index < pixel_count; ++pixel_index) {
     const std::size_t source_base = pixel_index * static_cast<std::size_t>(frame.samples_per_pixel);
     const std::size_t output_base = pixel_index * 4;
+    const int x = static_cast<int>(pixel_index % static_cast<std::size_t>(frame.width));
+    const int y = static_cast<int>(pixel_index / static_cast<std::size_t>(frame.width));
 
     if (frame.samples_per_pixel == 1) {
       const auto raw_sample = static_cast<std::uint16_t>(read_frame_sample(frame, source_base));
       raw_samples.push_back(raw_sample);
       const auto value = raw_plane_to_u8(raw_sample, frame.original_bits_per_sample);
-      rgba_pixels[output_base + 0] = value;
-      rgba_pixels[output_base + 1] = value;
-      rgba_pixels[output_base + 2] = value;
+      const auto mosaic = cfa_mosaic_pixel(value, frame.cfa_pattern, x, y);
+      rgba_pixels[output_base + 0] = mosaic.r;
+      rgba_pixels[output_base + 1] = mosaic.g;
+      rgba_pixels[output_base + 2] = mosaic.b;
       continue;
     }
 

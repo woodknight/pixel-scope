@@ -221,16 +221,16 @@ int main() {
     assert(image.raw_sample_at(0, 1).value() == 384);
     assert(image.raw_sample_at(1, 1).value() == 256);
     assert(image.pixel_at(0, 0)->r == 16);
-    assert(image.pixel_at(0, 0)->g == 16);
-    assert(image.pixel_at(0, 0)->b == 16);
-    assert(image.pixel_at(1, 0)->r == 255);
+    assert(image.pixel_at(0, 0)->g == 0);
+    assert(image.pixel_at(0, 0)->b == 0);
+    assert(image.pixel_at(1, 0)->r == 0);
     assert(image.pixel_at(1, 0)->g == 255);
-    assert(image.pixel_at(1, 0)->b == 255);
-    assert(image.pixel_at(0, 1)->r == 96);
+    assert(image.pixel_at(1, 0)->b == 0);
+    assert(image.pixel_at(0, 1)->r == 0);
     assert(image.pixel_at(0, 1)->g == 96);
-    assert(image.pixel_at(0, 1)->b == 96);
-    assert(image.pixel_at(1, 1)->r == 64);
-    assert(image.pixel_at(1, 1)->g == 64);
+    assert(image.pixel_at(0, 1)->b == 0);
+    assert(image.pixel_at(1, 1)->r == 0);
+    assert(image.pixel_at(1, 1)->g == 0);
     assert(image.pixel_at(1, 1)->b == 64);
   }
 
