@@ -1,9 +1,11 @@
 #include <cassert>
+#include <cstddef>
 #include <cstdint>
 #include <vector>
 
 #include "core/histogram.h"
 #include "core/image.h"
+#include "core/image_model.h"
 #include "core/viewport.h"
 
 int main() {
@@ -80,6 +82,108 @@ int main() {
     assert(histogram.luminance.bins[77] == 1);
     assert(histogram.luminance.bins[149] == 1);
     assert(histogram.luminance.bins[29] == 1);
+  }
+
+  {
+    pixelscope::core::ImageMetadata metadata{
+        .width = 513,
+        .height = 9,
+        .original_channel_count = 4,
+        .bits_per_channel = 8,
+        .source_path = "histogram-large.png",
+    };
+    std::vector<std::uint8_t> pixels(static_cast<std::size_t>(metadata.width * metadata.height * 4));
+    for (int y = 0; y < metadata.height; ++y) {
+      for (int x = 0; x < metadata.width; ++x) {
+        const std::size_t index = static_cast<std::size_t>((y * metadata.width + x) * 4);
+        pixels[index + 0] = static_cast<std::uint8_t>(x % 256);
+        pixels[index + 1] = static_cast<std::uint8_t>((x + y) % 256);
+        pixels[index + 2] = static_cast<std::uint8_t>((x * 3 + y * 5) % 256);
+        pixels[index + 3] = static_cast<std::uint8_t>(255 - (x % 64));
+      }
+    }
+
+    const pixelscope::core::ImageData image(metadata, std::move(pixels));
+    pixelscope::core::ImageHistogram expected;
+    expected.sample_count = static_cast<std::size_t>(metadata.width * metadata.height);
+    const auto& source_pixels = image.pixels_rgba8();
+    for (std::size_t index = 0; index + 3 < source_pixels.size(); index += 4) {
+      const auto red = source_pixels[index + 0];
+      const auto green = source_pixels[index + 1];
+      const auto blue = source_pixels[index + 2];
+      ++expected.red.bins[red];
+      ++expected.green.bins[green];
+      ++expected.blue.bins[blue];
+      const int weighted_sum = 77 * static_cast<int>(red) + 150 * static_cast<int>(green) +
+                               29 * static_cast<int>(blue) + 128;
+      ++expected.luminance.bins[static_cast<std::size_t>(weighted_sum / 256)];
+    }
+    for (std::size_t index = 0; index < 256; ++index) {
+      expected.red.max_count = std::max(expected.red.max_count, expected.red.bins[index]);
+      expected.green.max_count = std::max(expected.green.max_count, expected.green.bins[index]);
+      expected.blue.max_count = std::max(expected.blue.max_count, expected.blue.bins[index]);
+      expected.luminance.max_count = std::max(expected.luminance.max_count, expected.luminance.bins[index]);
+    }
+
+    const auto histogram = pixelscope::core::compute_histogram(image);
+    assert(histogram.sample_count == expected.sample_count);
+    assert(histogram.red.bins == expected.red.bins);
+    assert(histogram.green.bins == expected.green.bins);
+    assert(histogram.blue.bins == expected.blue.bins);
+    assert(histogram.luminance.bins == expected.luminance.bins);
+    assert(histogram.red.max_count == expected.red.max_count);
+    assert(histogram.green.max_count == expected.green.max_count);
+    assert(histogram.blue.max_count == expected.blue.max_count);
+    assert(histogram.luminance.max_count == expected.luminance.max_count);
+  }
+
+  {
+    pixelscope::core::ImageMetadata metadata{
+        .width = 4,
+        .height = 2,
+        .original_channel_count = 4,
+        .bits_per_channel = 8,
+        .source_path = "downsample.png",
+    };
+    pixelscope::core::ImageData image(metadata, std::vector<std::uint8_t>{
+                                                    1, 0, 0, 255,
+                                                    2, 0, 0, 255,
+                                                    3, 0, 0, 255,
+                                                    4, 0, 0, 255,
+                                                    5, 0, 0, 255,
+                                                    6, 0, 0, 255,
+                                                    7, 0, 0, 255,
+                                                    8, 0, 0, 255,
+                                                });
+    const auto downsampled = pixelscope::core::downsample_nearest_2x(image);
+    assert(downsampled.valid());
+    assert(downsampled.metadata().width == 2);
+    assert(downsampled.metadata().height == 1);
+    assert(downsampled.pixel_at(0, 0)->r == 1);
+    assert(downsampled.pixel_at(1, 0)->r == 3);
+  }
+
+  {
+    pixelscope::core::ImageMetadata metadata{
+        .width = 16,
+        .height = 8,
+        .original_channel_count = 4,
+        .bits_per_channel = 8,
+        .source_path = "model.png",
+    };
+    pixelscope::core::ImageData image(
+        metadata,
+        std::vector<std::uint8_t>(static_cast<std::size_t>(16 * 8 * 4), 255));
+    const auto model = pixelscope::core::build_image_model(std::move(image), 4);
+    assert(model.valid());
+    assert(model.display_levels.size() == 2);
+    assert(model.display_levels[0].downsample_factor == 2);
+    assert(model.display_levels[0].image.metadata().width == 8);
+    assert(model.display_levels[1].downsample_factor == 4);
+    assert(model.display_levels[1].image.metadata().width == 4);
+    assert(model.pick_display_level(0.6f)->downsample_factor == 2);
+    assert(model.pick_display_level(0.3f)->downsample_factor == 4);
+    assert(model.pick_display_level(0.1f)->downsample_factor == 4);
   }
 
   return 0;

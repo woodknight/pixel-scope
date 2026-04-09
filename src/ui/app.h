@@ -9,7 +9,7 @@
 #include <imgui.h>
 
 #include "core/histogram.h"
-#include "core/image.h"
+#include "core/image_model.h"
 #include "core/viewport.h"
 #include "render/texture_cache.h"
 
@@ -50,7 +50,7 @@ class App {
   std::optional<std::string> initial_path_;
   SDL_Window* window_ = nullptr;
   SDL_Renderer* renderer_ = nullptr;
-  pixelscope::core::ImageData image_;
+  pixelscope::core::ImageModel image_model_;
   pixelscope::core::ImageHistogram histogram_;
   pixelscope::core::ViewState view_;
   bool view_initialized_ = false;

@@ -17,17 +17,23 @@ Requirements:
 - a C++20 compiler
 - network access during the first configure so CMake can fetch SDL2, Dear ImGui, `stb`, and `tinyfiledialogs`
 
-Build and run:
+Configure and build:
 
 ```bash
 cmake -S . -B build
-cmake --build build
+cmake --build build --config Release
+```
+
+Run the app:
+
+```bash
 ./build/pixelscope
 ```
 
 Run tests:
 
 ```bash
+cmake --build build --target pixelscope_tests
 ctest --test-dir build --output-on-failure
 ```
 
@@ -41,5 +47,6 @@ Open an image from the `File` menu, with `Ctrl+O`, or by passing a file path on 
 
 - Display uses nearest-neighbor scaling only.
 - Pixel inspection reads from the CPU image model, not the display texture.
+- Large images now build a small set of nearest-neighbor preview levels in `core/` so the first on-screen upload can use a reduced display texture while keeping the full-resolution source image for inspection.
 - Histogram computation is derived from the source `RGBA8` image model and rendered as a lightweight overlay in the UI.
 - RAW, TIFF, and metadata panels are still follow-up work.

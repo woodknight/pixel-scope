@@ -179,13 +179,13 @@ int App::run() {
 }
 
 bool App::load_image(const std::string& path) {
-  const auto result = pixelscope::io::load_image_file(path);
+  auto result = pixelscope::io::load_image_file(path);
   if (!result.ok()) {
     last_error_ = result.error_message;
     return false;
   }
 
-  image_ = result.image;
+  image_model_ = pixelscope::core::build_image_model(std::move(result.image));
   histogram_ = {};
   histogram_ready_ = false;
   texture_cache_.clear();
@@ -197,11 +197,15 @@ bool App::load_image(const std::string& path) {
 }
 
 void App::fit_image_to_canvas(float width, float height) {
-  if (!image_.valid()) {
+  if (!image_model_.valid()) {
     return;
   }
 
-  view_.zoom = pixelscope::core::fit_zoom(image_.metadata().width, image_.metadata().height, width, height);
+  view_.zoom = pixelscope::core::fit_zoom(
+      image_model_.source.metadata().width,
+      image_model_.source.metadata().height,
+      width,
+      height);
   view_.pan = {};
   view_initialized_ = true;
 }
@@ -382,7 +386,7 @@ void App::draw_menu(bool& request_open_dialog) {
   }
 
   if (ImGui::BeginMenu("View")) {
-    const bool has_image = image_.valid();
+    const bool has_image = image_model_.valid();
     if (ImGui::MenuItem("Fit to Window", nullptr, false, has_image)) {
       fit_image_to_canvas(
           ImGui::GetMainViewport()->Size.x,
@@ -396,8 +400,8 @@ void App::draw_menu(bool& request_open_dialog) {
     ImGui::Separator();
     const bool histogram_enabled_before = show_histogram_;
     ImGui::MenuItem("Histogram Overlay", nullptr, &show_histogram_, has_image);
-    if (show_histogram_ && !histogram_enabled_before && image_.valid() && !histogram_ready_) {
-      histogram_ = pixelscope::core::compute_histogram(image_);
+    if (show_histogram_ && !histogram_enabled_before && image_model_.valid() && !histogram_ready_) {
+      histogram_ = pixelscope::core::compute_histogram(image_model_.source);
       histogram_ready_ = true;
     }
     ImGui::MenuItem("Pixel Grid", nullptr, &show_pixel_grid_, has_image);
@@ -418,7 +422,7 @@ void App::draw_canvas() {
   ImDrawList* draw_list = ImGui::GetWindowDrawList();
   draw_list->AddRectFilled(canvas_pos, ImVec2(canvas_pos.x + canvas_size.x, canvas_pos.y + canvas_size.y), IM_COL32(24, 26, 32, 255));
 
-  if (!image_.valid()) {
+  if (!image_model_.valid()) {
     const char* prompt = "Open a PNG or JPEG to inspect pixels.";
     const ImVec2 text_size = ImGui::CalcTextSize(prompt);
     draw_list->AddText(
@@ -429,14 +433,20 @@ void App::draw_canvas() {
     return;
   }
 
+  const auto& source_image = image_model_.source;
   if (!view_initialized_) {
     fit_image_to_canvas(canvas_size.x, canvas_size.y);
   }
 
-  SDL_Texture* texture = texture_cache_.ensure_texture(renderer_, image_);
+  const pixelscope::core::ImageData* display_image = &source_image;
+  if (const auto* level = image_model_.pick_display_level(view_.zoom)) {
+    display_image = &level->image;
+  }
+
+  SDL_Texture* texture = texture_cache_.ensure_texture(renderer_, *display_image);
   if (texture != nullptr) {
     const auto image_bounds =
-        pixelscope::core::image_rect(image_.metadata().width, image_.metadata().height, canvas_rect, view_);
+        pixelscope::core::image_rect(source_image.metadata().width, source_image.metadata().height, canvas_rect, view_);
     draw_list->AddImage(
         reinterpret_cast<ImTextureID>(texture),
         ImVec2(image_bounds.x, image_bounds.y),
@@ -445,8 +455,8 @@ void App::draw_canvas() {
       draw_pixel_grid_overlay(
           draw_list,
           image_bounds,
-          image_.metadata().width,
-          image_.metadata().height,
+          source_image.metadata().width,
+          source_image.metadata().height,
           view_.zoom);
     }
   }
@@ -467,22 +477,22 @@ void App::draw_canvas() {
           view_,
           view_.zoom * factor,
           to_vec2(ImGui::GetMousePos()),
-          image_.metadata().width,
-          image_.metadata().height,
+          source_image.metadata().width,
+          source_image.metadata().height,
           canvas_rect);
       view_initialized_ = true;
     }
 
     const auto image_point = pixelscope::core::screen_to_image(
         to_vec2(ImGui::GetMousePos()),
-        image_.metadata().width,
-        image_.metadata().height,
+        source_image.metadata().width,
+        source_image.metadata().height,
         canvas_rect,
         view_);
     if (image_point) {
       const int pixel_x = static_cast<int>(std::floor(image_point->x));
       const int pixel_y = static_cast<int>(std::floor(image_point->y));
-      if (const auto pixel = image_.pixel_at(pixel_x, pixel_y)) {
+      if (const auto pixel = source_image.pixel_at(pixel_x, pixel_y)) {
         hover_ = {.x = pixel_x, .y = pixel_y, .pixel = *pixel, .active = true};
       } else {
         reset_hover();
@@ -504,8 +514,8 @@ void App::draw_histogram_overlay(const pixelscope::core::Rect& canvas_rect) {
     return;
   }
 
-  if (!histogram_ready_ && image_.valid()) {
-    histogram_ = pixelscope::core::compute_histogram(image_);
+  if (!histogram_ready_ && image_model_.valid()) {
+    histogram_ = pixelscope::core::compute_histogram(image_model_.source);
     histogram_ready_ = true;
   }
 
@@ -564,8 +574,9 @@ void App::draw_histogram_overlay(const pixelscope::core::Rect& canvas_rect) {
 }
 
 void App::draw_status_bar() {
-  if (image_.valid()) {
-    ImGui::Text("Image %dx%d", image_.metadata().width, image_.metadata().height);
+  if (image_model_.valid()) {
+    const auto& source_image = image_model_.source;
+    ImGui::Text("Image %dx%d", source_image.metadata().width, source_image.metadata().height);
     ImGui::SameLine();
     ImGui::TextDisabled("|");
     ImGui::SameLine();

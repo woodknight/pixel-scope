@@ -65,6 +65,7 @@ endif()
 add_library(pixelscope_core STATIC
   src/core/histogram.cpp
   src/core/image.cpp
+  src/core/image_model.cpp
   src/core/viewport.cpp
   src/io/file_dialog.cpp
   src/io/image_loader.cpp
