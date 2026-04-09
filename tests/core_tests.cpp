@@ -38,6 +38,18 @@ int main() {
   }
 
   {
+    const auto image = pixelscope::io::load_image_file("../images/tree.dng");
+    assert(image.ok());
+    assert(image.image.valid());
+    assert(image.image.metadata().width == 4048);
+    assert(image.image.metadata().height == 3036);
+    assert(image.image.metadata().bits_per_channel == 10);
+    assert(image.image.metadata().original_channel_count == 1);
+    assert(image.image.metadata().is_raw_bayer_plane);
+    assert(image.image.has_raw_samples());
+  }
+
+  {
     pixelscope::core::ImageMetadata metadata{
         .width = 2,
         .height = 1,
