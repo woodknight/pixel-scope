@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <filesystem>
 #include <utility>
 
 #include <backends/imgui_impl_sdl2.h>
@@ -187,13 +188,43 @@ float App::compute_ui_scale() const {
   return std::clamp(std::max(pixel_ratio_scale, dpi_scale), 1.0f, 3.0f);
 }
 
+std::vector<std::string> App::preferred_font_paths() const {
+  return {
+      "/usr/share/fonts/truetype/ubuntu/UbuntuSans[wdth,wght].ttf",
+      "/usr/share/fonts/truetype/ubuntu/Ubuntu-R.ttf",
+      "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
+      "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+      "/usr/share/fonts/TTF/DejaVuSans.ttf",
+      "/Library/Fonts/Helvetica.ttc",
+      "/System/Library/Fonts/SFNS.ttf",
+      "C:/Windows/Fonts/segoeui.ttf",
+      "C:/Windows/Fonts/arial.ttf",
+  };
+}
+
 void App::apply_ui_scale(float scale) {
   ImGuiIO& io = ImGui::GetIO();
   io.Fonts->Clear();
 
   ImFontConfig font_config;
   font_config.SizePixels = kBaseFontSize * scale;
-  io.Fonts->AddFontDefault(&font_config);
+  font_config.OversampleH = 2;
+  font_config.OversampleV = 2;
+  font_config.PixelSnapH = false;
+
+  bool loaded_font = false;
+  for (const auto& path : preferred_font_paths()) {
+    if (!std::filesystem::exists(path)) {
+      continue;
+    }
+    if (io.Fonts->AddFontFromFileTTF(path.c_str(), font_config.SizePixels, &font_config) != nullptr) {
+      loaded_font = true;
+      break;
+    }
+  }
+  if (!loaded_font) {
+    io.Fonts->AddFontDefault(&font_config);
+  }
 
   ImGuiStyle scaled_style = base_style_;
   scaled_style.ScaleAllSizes(scale);

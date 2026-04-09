@@ -4,6 +4,7 @@
 
 #include <optional>
 #include <string>
+#include <vector>
 
 #include <imgui.h>
 
@@ -32,6 +33,7 @@ class App {
   bool load_image(const std::string& path);
   void fit_image_to_canvas(float width, float height);
   [[nodiscard]] float compute_ui_scale() const;
+  [[nodiscard]] std::vector<std::string> preferred_font_paths() const;
   void apply_ui_scale(float scale);
   void update_ui_scale_if_needed();
   void process_event(const SDL_Event& event, bool& running, bool& request_open_dialog);
