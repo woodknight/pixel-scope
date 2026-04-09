@@ -13,7 +13,7 @@ ImageData → RAW pipeline → Renderer → Screen
 ## Phase 1 foundation
 
 - `core/`
-  Holds the testable truth-path pieces: image storage and viewport math.
+  Holds the testable truth-path pieces: image storage, histogram computation, and viewport math.
 - `io/`
   Owns file dialogs and PNG/JPEG decode.
 - `render/`
@@ -25,6 +25,8 @@ ImageData → RAW pipeline → Renderer → Screen
 
 - Source data:
   `core::ImageData` stores the loaded RGBA8 buffer plus source metadata.
+- Derived inspection data:
+  `core::ImageHistogram` is computed from `core::ImageData` and cached by the app so UI drawing does not re-scan pixels every frame.
 - View state:
   `core::ViewState` stores zoom and pan only.
 - Display data:
@@ -32,7 +34,7 @@ ImageData → RAW pipeline → Renderer → Screen
 
 ## Follow-up tasks
 
-- Add histogram computation and a collapsible panel.
+- Extend the histogram model to support log scale, clipping indicators, and view-vs-full-image modes.
 - Add TIFF support behind the same `io/` interface.
 - Persist recent files and last window state.
 - Separate fit-to-window state from manual zoom state a bit more explicitly.

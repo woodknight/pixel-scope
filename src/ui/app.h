@@ -8,6 +8,7 @@
 
 #include <imgui.h>
 
+#include "core/histogram.h"
 #include "core/image.h"
 #include "core/viewport.h"
 #include "render/texture_cache.h"
@@ -42,6 +43,7 @@ class App {
   void draw_ui(bool& request_open_dialog);
   void draw_menu(bool& request_open_dialog);
   void draw_canvas();
+  void draw_histogram_overlay(const pixelscope::core::Rect& canvas_rect);
   void draw_status_bar();
   void reset_hover();
 
@@ -49,8 +51,11 @@ class App {
   SDL_Window* window_ = nullptr;
   SDL_Renderer* renderer_ = nullptr;
   pixelscope::core::ImageData image_;
+  pixelscope::core::ImageHistogram histogram_;
   pixelscope::core::ViewState view_;
   bool view_initialized_ = false;
+  bool histogram_ready_ = false;
+  bool show_histogram_ = false;
   bool show_pixel_grid_ = false;
   int open_dialog_delay_frames_ = 0;
   float renderer_scale_ = 1.0f;
