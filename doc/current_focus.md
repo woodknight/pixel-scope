@@ -4,12 +4,7 @@ Context:
 - Read docs inside `docs/`
 
 Task:
-- Create a minimal cross-platform desktop app skeleton
-- Add a main window
-- Add an image canvas widget
-- Add file open support for PNG and JPEG
-- Add zoom and pan support
-- Add pixel readout in a status bar
+- Add a toggle to show histogram. show histogram in a small overlay on lower left corner.
 
 Constraints:
 - Keep dependencies minimal
