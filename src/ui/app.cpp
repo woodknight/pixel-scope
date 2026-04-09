@@ -23,6 +23,9 @@ constexpr float kZoomStep = 1.15f;
 constexpr float kBaseFontSize = 16.0f;
 constexpr float kBaseStatusBarHeight = 28.0f;
 constexpr float kGridMinZoom = 8.0f;
+constexpr float kHistogramOverlayWidth = 240.0f;
+constexpr float kHistogramOverlayHeight = 128.0f;
+constexpr float kHistogramOverlayMargin = 16.0f;
 
 pixelscope::core::Rect to_rect(const ImVec2& min, const ImVec2& size) {
   return {.x = min.x, .y = min.y, .w = size.x, .h = size.y};
@@ -183,6 +186,8 @@ bool App::load_image(const std::string& path) {
   }
 
   image_ = result.image;
+  histogram_ = {};
+  histogram_ready_ = false;
   texture_cache_.clear();
   last_error_.clear();
   reset_hover();
@@ -389,6 +394,12 @@ void App::draw_menu(bool& request_open_dialog) {
       view_initialized_ = true;
     }
     ImGui::Separator();
+    const bool histogram_enabled_before = show_histogram_;
+    ImGui::MenuItem("Histogram Overlay", nullptr, &show_histogram_, has_image);
+    if (show_histogram_ && !histogram_enabled_before && image_.valid() && !histogram_ready_) {
+      histogram_ = pixelscope::core::compute_histogram(image_);
+      histogram_ready_ = true;
+    }
     ImGui::MenuItem("Pixel Grid", nullptr, &show_pixel_grid_, has_image);
     ImGui::EndMenu();
   }
@@ -483,7 +494,73 @@ void App::draw_canvas() {
     reset_hover();
   }
 
+  draw_histogram_overlay(canvas_rect);
+
   ImGui::EndChild();
+}
+
+void App::draw_histogram_overlay(const pixelscope::core::Rect& canvas_rect) {
+  if (!show_histogram_) {
+    return;
+  }
+
+  if (!histogram_ready_ && image_.valid()) {
+    histogram_ = pixelscope::core::compute_histogram(image_);
+    histogram_ready_ = true;
+  }
+
+  if (histogram_.empty()) {
+    return;
+  }
+
+  ImDrawList* draw_list = ImGui::GetWindowDrawList();
+  if (draw_list == nullptr) {
+    return;
+  }
+
+  const float overlay_width = kHistogramOverlayWidth * ui_scale_;
+  const float overlay_height = kHistogramOverlayHeight * ui_scale_;
+  const float margin = kHistogramOverlayMargin * ui_scale_;
+  const float title_height = 20.0f * ui_scale_;
+  const float padding = 10.0f * ui_scale_;
+
+  const ImVec2 overlay_min(canvas_rect.x + margin, canvas_rect.y + canvas_rect.h - overlay_height - margin);
+  const ImVec2 overlay_max(overlay_min.x + overlay_width, overlay_min.y + overlay_height);
+  const ImVec2 plot_min(overlay_min.x + padding, overlay_min.y + title_height + padding * 0.5f);
+  const ImVec2 plot_max(overlay_max.x - padding, overlay_max.y - padding);
+
+  draw_list->AddRectFilled(overlay_min, overlay_max, IM_COL32(10, 12, 16, 220), 6.0f);
+  draw_list->AddRect(overlay_min, overlay_max, IM_COL32(190, 194, 204, 90), 6.0f, 0, 1.0f);
+  draw_list->AddText(
+      ImVec2(overlay_min.x + padding, overlay_min.y + 4.0f * ui_scale_),
+      IM_COL32(224, 228, 236, 255),
+      "Histogram");
+  draw_list->AddRect(plot_min, plot_max, IM_COL32(255, 255, 255, 28), 0.0f, 0, 1.0f);
+
+  const auto draw_channel = [&](const pixelscope::core::HistogramChannel& channel, ImU32 color) {
+    if (channel.max_count == 0) {
+      return;
+    }
+
+    for (int index = 1; index < 256; ++index) {
+      const float x0 = plot_min.x + (plot_max.x - plot_min.x) * (static_cast<float>(index - 1) / 255.0f);
+      const float x1 = plot_min.x + (plot_max.x - plot_min.x) * (static_cast<float>(index) / 255.0f);
+      const float y0 = plot_max.y -
+                       (plot_max.y - plot_min.y) *
+                           (static_cast<float>(channel.bins[static_cast<std::size_t>(index - 1)]) /
+                               static_cast<float>(channel.max_count));
+      const float y1 = plot_max.y -
+                       (plot_max.y - plot_min.y) *
+                           (static_cast<float>(channel.bins[static_cast<std::size_t>(index)]) /
+                               static_cast<float>(channel.max_count));
+      draw_list->AddLine(ImVec2(x0, y0), ImVec2(x1, y1), color, 1.5f * ui_scale_);
+    }
+  };
+
+  draw_channel(histogram_.luminance, IM_COL32(220, 220, 220, 190));
+  draw_channel(histogram_.red, IM_COL32(255, 96, 96, 210));
+  draw_channel(histogram_.green, IM_COL32(96, 220, 120, 210));
+  draw_channel(histogram_.blue, IM_COL32(96, 156, 255, 210));
 }
 
 void App::draw_status_bar() {

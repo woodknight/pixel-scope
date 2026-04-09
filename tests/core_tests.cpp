@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <vector>
 
+#include "core/histogram.h"
 #include "core/image.h"
 #include "core/viewport.h"
 
@@ -50,6 +51,35 @@ int main() {
     assert(anchored.has_value());
     assert(static_cast<int>(anchored->x) == 25);
     assert(static_cast<int>(anchored->y) == 25);
+  }
+
+  {
+    pixelscope::core::ImageMetadata metadata{
+        .width = 2,
+        .height = 2,
+        .original_channel_count = 4,
+        .bits_per_channel = 8,
+        .source_path = "histogram.png",
+    };
+    pixelscope::core::ImageData image(metadata, std::vector<std::uint8_t>{
+                                                    0, 0, 0, 255,
+                                                    255, 0, 0, 255,
+                                                    0, 255, 0, 255,
+                                                    0, 0, 255, 255,
+                                                });
+    const auto histogram = pixelscope::core::compute_histogram(image);
+    assert(!histogram.empty());
+    assert(histogram.sample_count == 4);
+    assert(histogram.red.bins[0] == 3);
+    assert(histogram.red.bins[255] == 1);
+    assert(histogram.green.bins[0] == 3);
+    assert(histogram.green.bins[255] == 1);
+    assert(histogram.blue.bins[0] == 3);
+    assert(histogram.blue.bins[255] == 1);
+    assert(histogram.luminance.bins[0] == 1);
+    assert(histogram.luminance.bins[77] == 1);
+    assert(histogram.luminance.bins[149] == 1);
+    assert(histogram.luminance.bins[29] == 1);
   }
 
   return 0;

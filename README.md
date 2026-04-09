@@ -7,7 +7,8 @@ This Phase 1 foundation includes:
 - a main canvas window with nearest-neighbor zoom and pan
 - PNG and JPEG loading
 - exact CPU-side pixel readout in the status bar
-- a small testable `core/` layer for image data and viewport math
+- a lower-left histogram overlay with a `View` menu toggle
+- a small testable `core/` layer for image data, histogram computation, and viewport math
 
 ## Build
 
@@ -40,4 +41,5 @@ Open an image from the `File` menu, with `Ctrl+O`, or by passing a file path on 
 
 - Display uses nearest-neighbor scaling only.
 - Pixel inspection reads from the CPU image model, not the display texture.
-- RAW, TIFF, histogram, and metadata panels are still follow-up work.
+- Histogram computation is derived from the source `RGBA8` image model and rendered as a lightweight overlay in the UI.
+- RAW, TIFF, and metadata panels are still follow-up work.
