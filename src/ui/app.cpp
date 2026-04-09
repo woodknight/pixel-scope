@@ -552,6 +552,7 @@ void App::draw_canvas() {
             .x = pixel_x,
             .y = pixel_y,
             .pixel = *pixel,
+            .pixel16 = source_image.pixel16_at(pixel_x, pixel_y),
             .raw_sample = source_image.raw_sample_at(pixel_x, pixel_y),
             .active = true,
         };
@@ -653,6 +654,13 @@ void App::draw_status_bar() {
             cfa_label(source_image.metadata(), hover_.x, hover_.y),
             hover_.raw_sample.value(),
             raw_sample_display_value(hover_.raw_sample.value(), source_image.metadata().bits_per_channel));
+      } else if (hover_.pixel16.has_value()) {
+        ImGui::Text("Pixel (%d, %d) RGB16 [%u, %u, %u]",
+            hover_.x,
+            hover_.y,
+            hover_.pixel16->r,
+            hover_.pixel16->g,
+            hover_.pixel16->b);
       } else {
         ImGui::Text("Pixel (%d, %d) RGB [%u, %u, %u]",
             hover_.x,

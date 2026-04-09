@@ -168,9 +168,12 @@ pixelscope::core::ImageData rgba8_image_from_dng_frame(
 
   std::vector<std::uint8_t> rgba_pixels(static_cast<std::size_t>(frame.width * frame.height * 4), 255);
   std::vector<std::uint16_t> raw_samples;
+  std::vector<std::uint16_t> rgba16_pixels;
   const std::size_t pixel_count = static_cast<std::size_t>(frame.width) * static_cast<std::size_t>(frame.height);
   if (frame.samples_per_pixel == 1) {
     raw_samples.reserve(pixel_count);
+  } else if ((frame.original_bits_per_sample > 8 || frame.bits_per_sample > 8)) {
+    rgba16_pixels.resize(pixel_count * 4, std::numeric_limits<std::uint16_t>::max());
   }
   for (std::size_t pixel_index = 0; pixel_index < pixel_count; ++pixel_index) {
     const std::size_t source_base = pixel_index * static_cast<std::size_t>(frame.samples_per_pixel);
@@ -190,17 +193,25 @@ pixelscope::core::ImageData rgba8_image_from_dng_frame(
     }
 
     for (int channel = 0; channel < 3; ++channel) {
+      const auto sample = read_frame_sample(frame, source_base + static_cast<std::size_t>(channel));
       rgba_pixels[output_base + static_cast<std::size_t>(channel)] = normalize_to_u8(
-          read_frame_sample(frame, source_base + static_cast<std::size_t>(channel)),
+          sample,
           frame.black_levels[static_cast<std::size_t>(channel)],
           resolve_white_level(frame, channel));
+      if (!rgba16_pixels.empty()) {
+        rgba16_pixels[output_base + static_cast<std::size_t>(channel)] = static_cast<std::uint16_t>(sample);
+      }
     }
 
     if (frame.samples_per_pixel == 4) {
+      const auto alpha_sample = read_frame_sample(frame, source_base + 3);
       rgba_pixels[output_base + 3] = normalize_to_u8(
-          read_frame_sample(frame, source_base + 3),
+          alpha_sample,
           frame.black_levels[3],
           resolve_white_level(frame, 3));
+      if (!rgba16_pixels.empty()) {
+        rgba16_pixels[output_base + 3] = static_cast<std::uint16_t>(alpha_sample);
+      }
     }
   }
 
@@ -213,7 +224,11 @@ pixelscope::core::ImageData rgba8_image_from_dng_frame(
       .cfa_pattern = frame.cfa_pattern,
       .source_path = source_path,
   };
-  return pixelscope::core::ImageData(std::move(metadata), std::move(rgba_pixels), std::move(raw_samples));
+  return pixelscope::core::ImageData(
+      std::move(metadata),
+      std::move(rgba_pixels),
+      std::move(raw_samples),
+      std::move(rgba16_pixels));
 }
 
 pixelscope::core::ImageData render_raw_bayer_image(

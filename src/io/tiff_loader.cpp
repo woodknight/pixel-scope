@@ -64,6 +64,10 @@ LoadImageResult decode_contiguous_tiff(
 
   std::vector<std::uint8_t> scanline(static_cast<std::size_t>(scanline_size));
   std::vector<std::uint8_t> pixels(static_cast<std::size_t>(width) * static_cast<std::size_t>(height) * 4u);
+  std::vector<std::uint16_t> pixels16;
+  if (bits_per_channel > 8) {
+    pixels16.resize(static_cast<std::size_t>(width) * static_cast<std::size_t>(height) * 4u);
+  }
   const bool invert_gray = photometric == PHOTOMETRIC_MINISWHITE;
   const std::size_t bytes_per_sample = static_cast<std::size_t>(bits_per_channel / 8);
 
@@ -106,6 +110,12 @@ LoadImageResult decode_contiguous_tiff(
       pixels[rgba_offset + 1] = sample_to_u8(g, bits_per_channel, invert_channel);
       pixels[rgba_offset + 2] = sample_to_u8(b, bits_per_channel, invert_channel);
       pixels[rgba_offset + 3] = sample_to_u8(a, bits_per_channel);
+      if (!pixels16.empty()) {
+        pixels16[rgba_offset + 0] = static_cast<std::uint16_t>(invert_channel ? max_value_for_bits(bits_per_channel) - r : r);
+        pixels16[rgba_offset + 1] = static_cast<std::uint16_t>(invert_channel ? max_value_for_bits(bits_per_channel) - g : g);
+        pixels16[rgba_offset + 2] = static_cast<std::uint16_t>(invert_channel ? max_value_for_bits(bits_per_channel) - b : b);
+        pixels16[rgba_offset + 3] = static_cast<std::uint16_t>(a);
+      }
     }
   }
 
@@ -116,7 +126,7 @@ LoadImageResult decode_contiguous_tiff(
       .bits_per_channel = bits_per_channel,
       .source_path = path,
   };
-  return {.image = pixelscope::core::ImageData(std::move(metadata), std::move(pixels))};
+  return {.image = pixelscope::core::ImageData(std::move(metadata), std::move(pixels), {}, std::move(pixels16))};
 }
 
 LoadImageResult decode_separate_tiff(
@@ -136,6 +146,10 @@ LoadImageResult decode_separate_tiff(
       static_cast<std::size_t>(samples_per_pixel),
       std::vector<std::uint8_t>(static_cast<std::size_t>(scanline_size)));
   std::vector<std::uint8_t> pixels(static_cast<std::size_t>(width) * static_cast<std::size_t>(height) * 4u);
+  std::vector<std::uint16_t> pixels16;
+  if (bits_per_channel > 8) {
+    pixels16.resize(static_cast<std::size_t>(width) * static_cast<std::size_t>(height) * 4u);
+  }
   const bool invert_gray = photometric == PHOTOMETRIC_MINISWHITE;
   const std::size_t bytes_per_sample = static_cast<std::size_t>(bits_per_channel / 8);
 
@@ -182,6 +196,12 @@ LoadImageResult decode_separate_tiff(
       pixels[rgba_offset + 1] = sample_to_u8(g, bits_per_channel, invert_channel);
       pixels[rgba_offset + 2] = sample_to_u8(b, bits_per_channel, invert_channel);
       pixels[rgba_offset + 3] = sample_to_u8(a, bits_per_channel);
+      if (!pixels16.empty()) {
+        pixels16[rgba_offset + 0] = static_cast<std::uint16_t>(invert_channel ? max_value_for_bits(bits_per_channel) - r : r);
+        pixels16[rgba_offset + 1] = static_cast<std::uint16_t>(invert_channel ? max_value_for_bits(bits_per_channel) - g : g);
+        pixels16[rgba_offset + 2] = static_cast<std::uint16_t>(invert_channel ? max_value_for_bits(bits_per_channel) - b : b);
+        pixels16[rgba_offset + 3] = static_cast<std::uint16_t>(a);
+      }
     }
   }
 
@@ -192,7 +212,7 @@ LoadImageResult decode_separate_tiff(
       .bits_per_channel = bits_per_channel,
       .source_path = path,
   };
-  return {.image = pixelscope::core::ImageData(std::move(metadata), std::move(pixels))};
+  return {.image = pixelscope::core::ImageData(std::move(metadata), std::move(pixels), {}, std::move(pixels16))};
 }
 
 }  // namespace

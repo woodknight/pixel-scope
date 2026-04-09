@@ -16,6 +16,13 @@ struct PixelRgba8 {
   std::uint8_t a = 255;
 };
 
+struct PixelRgba16 {
+  std::uint16_t r = 0;
+  std::uint16_t g = 0;
+  std::uint16_t b = 0;
+  std::uint16_t a = 65535;
+};
+
 struct ImageMetadata {
   int width = 0;
   int height = 0;
@@ -32,14 +39,18 @@ class ImageData {
   ImageData(
       ImageMetadata metadata,
       std::vector<std::uint8_t> pixels_rgba8,
-      std::vector<std::uint16_t> raw_samples = {});
+      std::vector<std::uint16_t> raw_samples = {},
+      std::vector<std::uint16_t> pixels_rgba16 = {});
 
   [[nodiscard]] bool valid() const;
   [[nodiscard]] const ImageMetadata& metadata() const;
   [[nodiscard]] const std::vector<std::uint8_t>& pixels_rgba8() const;
   [[nodiscard]] const std::vector<std::uint16_t>& raw_samples() const;
+  [[nodiscard]] const std::vector<std::uint16_t>& pixels_rgba16() const;
   [[nodiscard]] std::optional<PixelRgba8> pixel_at(int x, int y) const;
+  [[nodiscard]] std::optional<PixelRgba16> pixel16_at(int x, int y) const;
   [[nodiscard]] bool has_raw_samples() const;
+  [[nodiscard]] bool has_pixels_rgba16() const;
   [[nodiscard]] std::optional<std::uint16_t> raw_sample_at(int x, int y) const;
   [[nodiscard]] std::size_t byte_size() const;
 
@@ -47,6 +58,7 @@ class ImageData {
   ImageMetadata metadata_;
   std::vector<std::uint8_t> pixels_rgba8_;
   std::vector<std::uint16_t> raw_samples_;
+  std::vector<std::uint16_t> pixels_rgba16_;
 };
 
 }  // namespace pixelscope::core

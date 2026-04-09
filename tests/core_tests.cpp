@@ -1,6 +1,7 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
+#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -30,6 +31,10 @@ int main() {
     assert(image.image.metadata().height == 2048);
     assert(image.image.metadata().bits_per_channel == 16);
     assert(image.image.metadata().original_channel_count == 3);
+    assert(image.image.has_pixels_rgba16());
+    assert(!image.image.pixels_rgba16().empty());
+    const auto max_sample = *std::max_element(image.image.pixels_rgba16().begin(), image.image.pixels_rgba16().end());
+    assert(max_sample > 255);
   }
 
   {
@@ -276,6 +281,12 @@ int main() {
     assert(image.valid());
     assert(!image.metadata().is_raw_bayer_plane);
     assert(!image.has_raw_samples());
+    assert(image.has_pixels_rgba16());
+    const auto pixel16 = image.pixel16_at(0, 0);
+    assert(pixel16.has_value());
+    assert(pixel16->r == 512);
+    assert(pixel16->g == 640);
+    assert(pixel16->b == 576);
     const auto pixel = image.pixel_at(0, 0);
     assert(pixel.has_value());
     assert(pixel->r == 128);
