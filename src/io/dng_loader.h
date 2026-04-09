@@ -31,6 +31,9 @@ struct DngFrame {
 [[nodiscard]] pixelscope::core::ImageData rgba8_image_from_dng_frame(
     const DngFrame& frame,
     const std::string& source_path);
+[[nodiscard]] pixelscope::core::ImageData render_raw_bayer_image(
+    const pixelscope::core::ImageData& source,
+    bool use_cfa_colors);
 [[nodiscard]] DngLoadResult load_dng_file(const std::string& path);
 
 }  // namespace pixelscope::io

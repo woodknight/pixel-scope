@@ -10,6 +10,7 @@
 #include <backends/imgui_impl_sdl2.h>
 #include <backends/imgui_impl_sdlrenderer2.h>
 
+#include "io/dng_loader.h"
 #include "io/file_dialog.h"
 #include "io/image_loader.h"
 
@@ -32,6 +33,15 @@ pixelscope::core::Rect to_rect(const ImVec2& min, const ImVec2& size) {
 }
 
 pixelscope::core::Vec2 to_vec2(const ImVec2& value) { return {.x = value.x, .y = value.y}; }
+
+std::uint8_t raw_sample_display_value(std::uint16_t sample, int bits_per_channel) {
+  const int bits = std::max(1, bits_per_channel);
+  if (bits <= 8) {
+    return static_cast<std::uint8_t>(std::min<int>(sample, 255));
+  }
+
+  return static_cast<std::uint8_t>(std::min<int>(sample >> (bits - 8), 255));
+}
 
 const char* cfa_label(const pixelscope::core::ImageMetadata& metadata, int x, int y) {
   if (!metadata.is_raw_bayer_plane) {
@@ -204,6 +214,10 @@ bool App::load_image(const std::string& path) {
     return false;
   }
 
+  if (result.image.metadata().is_raw_bayer_plane && !show_dng_cfa_colors_) {
+    result.image = pixelscope::io::render_raw_bayer_image(result.image, false);
+  }
+
   image_model_ = pixelscope::core::build_image_model(std::move(result.image));
   histogram_ = {};
   histogram_ready_ = false;
@@ -213,6 +227,24 @@ bool App::load_image(const std::string& path) {
   view_ = {};
   view_initialized_ = false;
   return true;
+}
+
+void App::refresh_dng_rendering() {
+  if (!image_model_.valid()) {
+    return;
+  }
+
+  const auto& source = image_model_.source;
+  if (!source.metadata().is_raw_bayer_plane) {
+    return;
+  }
+
+  image_model_ = pixelscope::core::build_image_model(
+      pixelscope::io::render_raw_bayer_image(source, show_dng_cfa_colors_));
+  histogram_ = {};
+  histogram_ready_ = false;
+  texture_cache_.clear();
+  reset_hover();
 }
 
 void App::fit_image_to_canvas(float width, float height) {
@@ -406,6 +438,7 @@ void App::draw_menu(bool& request_open_dialog) {
 
   if (ImGui::BeginMenu("View")) {
     const bool has_image = image_model_.valid();
+    const bool has_raw_bayer_dng = has_image && image_model_.source.metadata().is_raw_bayer_plane;
     if (ImGui::MenuItem("Fit to Window", nullptr, false, has_image)) {
       fit_image_to_canvas(
           ImGui::GetMainViewport()->Size.x,
@@ -424,6 +457,9 @@ void App::draw_menu(bool& request_open_dialog) {
       histogram_ready_ = true;
     }
     ImGui::MenuItem("Pixel Grid", nullptr, &show_pixel_grid_, has_image);
+    if (ImGui::MenuItem("DNG CFA Colors", nullptr, &show_dng_cfa_colors_, has_raw_bayer_dng)) {
+      refresh_dng_rendering();
+    }
     ImGui::EndMenu();
   }
 
@@ -616,7 +652,7 @@ void App::draw_status_bar() {
             hover_.y,
             cfa_label(source_image.metadata(), hover_.x, hover_.y),
             hover_.raw_sample.value(),
-            hover_.pixel.r);
+            raw_sample_display_value(hover_.raw_sample.value(), source_image.metadata().bits_per_channel));
       } else {
         ImGui::Text("Pixel (%d, %d) RGB [%u, %u, %u]",
             hover_.x,

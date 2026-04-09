@@ -37,6 +37,7 @@ class ImageData {
   [[nodiscard]] bool valid() const;
   [[nodiscard]] const ImageMetadata& metadata() const;
   [[nodiscard]] const std::vector<std::uint8_t>& pixels_rgba8() const;
+  [[nodiscard]] const std::vector<std::uint16_t>& raw_samples() const;
   [[nodiscard]] std::optional<PixelRgba8> pixel_at(int x, int y) const;
   [[nodiscard]] bool has_raw_samples() const;
   [[nodiscard]] std::optional<std::uint16_t> raw_sample_at(int x, int y) const;

@@ -216,6 +216,38 @@ pixelscope::core::ImageData rgba8_image_from_dng_frame(
   return pixelscope::core::ImageData(std::move(metadata), std::move(rgba_pixels), std::move(raw_samples));
 }
 
+pixelscope::core::ImageData render_raw_bayer_image(
+    const pixelscope::core::ImageData& source,
+    bool use_cfa_colors) {
+  if (!source.valid()) {
+    return {};
+  }
+
+  const auto& metadata = source.metadata();
+  const auto& raw_samples = source.raw_samples();
+  if (!metadata.is_raw_bayer_plane || raw_samples.empty()) {
+    return source;
+  }
+
+  std::vector<std::uint8_t> rgba_pixels(static_cast<std::size_t>(metadata.width * metadata.height * 4), 255);
+  const std::size_t pixel_count = static_cast<std::size_t>(metadata.width) * static_cast<std::size_t>(metadata.height);
+  for (std::size_t pixel_index = 0; pixel_index < pixel_count; ++pixel_index) {
+    const std::size_t output_base = pixel_index * 4;
+    const int x = static_cast<int>(pixel_index % static_cast<std::size_t>(metadata.width));
+    const int y = static_cast<int>(pixel_index / static_cast<std::size_t>(metadata.width));
+    const std::uint8_t value = raw_plane_to_u8(raw_samples[pixel_index], metadata.bits_per_channel);
+    const auto pixel = use_cfa_colors
+                           ? cfa_mosaic_pixel(value, metadata.cfa_pattern, x, y)
+                           : pixelscope::core::PixelRgba8{.r = value, .g = value, .b = value, .a = 255};
+    rgba_pixels[output_base + 0] = pixel.r;
+    rgba_pixels[output_base + 1] = pixel.g;
+    rgba_pixels[output_base + 2] = pixel.b;
+    rgba_pixels[output_base + 3] = pixel.a;
+  }
+
+  return pixelscope::core::ImageData(metadata, std::move(rgba_pixels), raw_samples);
+}
+
 DngLoadResult load_dng_file(const std::string& path) {
   std::vector<tinydng::FieldInfo> custom_fields;
   std::vector<tinydng::DNGImage> images;

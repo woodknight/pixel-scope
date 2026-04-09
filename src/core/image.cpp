@@ -21,6 +21,8 @@ const ImageMetadata& ImageData::metadata() const { return metadata_; }
 
 const std::vector<std::uint8_t>& ImageData::pixels_rgba8() const { return pixels_rgba8_; }
 
+const std::vector<std::uint16_t>& ImageData::raw_samples() const { return raw_samples_; }
+
 std::optional<PixelRgba8> ImageData::pixel_at(int x, int y) const {
   if (!valid() || x < 0 || y < 0 || x >= metadata_.width || y >= metadata_.height) {
     return std::nullopt;

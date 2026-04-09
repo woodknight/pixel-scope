@@ -47,6 +47,7 @@ class App {
   void draw_canvas();
   void draw_histogram_overlay(const pixelscope::core::Rect& canvas_rect);
   void draw_status_bar();
+  void refresh_dng_rendering();
   void reset_hover();
 
   std::optional<std::string> initial_path_;
@@ -59,6 +60,7 @@ class App {
   bool histogram_ready_ = false;
   bool show_histogram_ = false;
   bool show_pixel_grid_ = false;
+  bool show_dng_cfa_colors_ = false;
   int open_dialog_delay_frames_ = 0;
   float renderer_scale_ = 1.0f;
   float ui_scale_ = 1.0f;
