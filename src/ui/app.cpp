@@ -27,6 +27,7 @@ constexpr float kGridMinZoom = 8.0f;
 constexpr float kHistogramOverlayWidth = 240.0f;
 constexpr float kHistogramOverlayHeight = 128.0f;
 constexpr float kHistogramOverlayMargin = 16.0f;
+constexpr int kMaxGridLinesPerAxis = 4096;
 
 pixelscope::core::Rect to_rect(const ImVec2& min, const ImVec2& size) {
   return {.x = min.x, .y = min.y, .w = size.x, .h = size.y};
@@ -65,6 +66,7 @@ const char* cfa_label(const pixelscope::core::ImageMetadata& metadata, int x, in
 void draw_pixel_grid_overlay(
     ImDrawList* draw_list,
     const pixelscope::core::Rect& image_bounds,
+    const pixelscope::core::Rect& canvas_rect,
     int image_width,
     int image_height,
     float zoom) {
@@ -72,21 +74,35 @@ void draw_pixel_grid_overlay(
     return;
   }
 
+  const int start_x = std::max(0, static_cast<int>(std::floor((canvas_rect.x - image_bounds.x) / zoom)));
+  const int end_x =
+      std::min(image_width, static_cast<int>(std::ceil((canvas_rect.x + canvas_rect.w - image_bounds.x) / zoom)));
+  const int start_y = std::max(0, static_cast<int>(std::floor((canvas_rect.y - image_bounds.y) / zoom)));
+  const int end_y =
+      std::min(image_height, static_cast<int>(std::ceil((canvas_rect.y + canvas_rect.h - image_bounds.y) / zoom)));
+
+  if (end_x < start_x || end_y < start_y) {
+    return;
+  }
+  if ((end_x - start_x) > kMaxGridLinesPerAxis || (end_y - start_y) > kMaxGridLinesPerAxis) {
+    return;
+  }
+
   const ImU32 grid_color = IM_COL32(255, 255, 255, 48);
-  for (int x = 0; x <= image_width; ++x) {
+  for (int x = start_x; x <= end_x; ++x) {
     const float screen_x = image_bounds.x + static_cast<float>(x) * zoom;
     draw_list->AddLine(
-        ImVec2(screen_x, image_bounds.y),
-        ImVec2(screen_x, image_bounds.y + image_bounds.h),
+        ImVec2(screen_x, std::max(image_bounds.y, canvas_rect.y)),
+        ImVec2(screen_x, std::min(image_bounds.y + image_bounds.h, canvas_rect.y + canvas_rect.h)),
         grid_color,
         1.0f);
   }
 
-  for (int y = 0; y <= image_height; ++y) {
+  for (int y = start_y; y <= end_y; ++y) {
     const float screen_y = image_bounds.y + static_cast<float>(y) * zoom;
     draw_list->AddLine(
-        ImVec2(image_bounds.x, screen_y),
-        ImVec2(image_bounds.x + image_bounds.w, screen_y),
+        ImVec2(std::max(image_bounds.x, canvas_rect.x), screen_y),
+        ImVec2(std::min(image_bounds.x + image_bounds.w, canvas_rect.x + canvas_rect.w), screen_y),
         grid_color,
         1.0f);
   }
@@ -123,11 +139,7 @@ bool App::initialize() {
     return false;
   }
 
-  renderer_ = SDL_CreateRenderer(window_, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
-  if (renderer_ == nullptr) {
-    renderer_ = SDL_CreateRenderer(window_, -1, SDL_RENDERER_SOFTWARE);
-  }
-  if (renderer_ == nullptr) {
+  if (!create_renderer()) {
     last_error_ = SDL_GetError();
     return false;
   }
@@ -155,6 +167,58 @@ bool App::initialize() {
     load_image(*initial_path_);
   }
   return true;
+}
+
+bool App::create_renderer() {
+  if (window_ == nullptr) {
+    return false;
+  }
+
+  const std::vector<std::pair<const char*, std::uint32_t>> attempts = {
+      {"opengl", SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC},
+      {"opengles2", SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC},
+      {"metal", SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC},
+      {"direct3d11", SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC},
+      {"direct3d", SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC},
+      {nullptr, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC},
+      {nullptr, SDL_RENDERER_ACCELERATED},
+      {"software", SDL_RENDERER_SOFTWARE},
+  };
+
+  std::string errors;
+  for (const auto& [driver_name, flags] : attempts) {
+    if (driver_name != nullptr) {
+      SDL_SetHint(SDL_HINT_RENDER_DRIVER, driver_name);
+    } else {
+      SDL_SetHint(SDL_HINT_RENDER_DRIVER, "");
+    }
+
+    renderer_ = SDL_CreateRenderer(window_, -1, flags);
+    if (renderer_ == nullptr) {
+      if (!errors.empty()) {
+        errors += '\n';
+      }
+      errors += driver_name != nullptr ? driver_name : "auto";
+      errors += ": ";
+      errors += SDL_GetError();
+      continue;
+    }
+
+    SDL_RendererInfo info{};
+    if (SDL_GetRendererInfo(renderer_, &info) == 0) {
+      renderer_name_ = info.name != nullptr ? info.name : "";
+    } else if (driver_name != nullptr) {
+      renderer_name_ = driver_name;
+    } else {
+      renderer_name_ = "unknown";
+    }
+
+    SDL_Log("PixelScope renderer: %s", renderer_name_.c_str());
+    return true;
+  }
+
+  last_error_ = errors;
+  return false;
 }
 
 int App::run() {
@@ -510,6 +574,7 @@ void App::draw_canvas() {
       draw_pixel_grid_overlay(
           draw_list,
           image_bounds,
+          canvas_rect,
           source_image.metadata().width,
           source_image.metadata().height,
           view_.zoom);
@@ -643,6 +708,12 @@ void App::draw_status_bar() {
     ImGui::TextDisabled("|");
     ImGui::SameLine();
     ImGui::Text("Zoom %.2fx", view_.zoom);
+    if (!renderer_name_.empty()) {
+      ImGui::SameLine();
+      ImGui::TextDisabled("|");
+      ImGui::SameLine();
+      ImGui::Text("Renderer %s", renderer_name_.c_str());
+    }
     ImGui::SameLine();
     ImGui::TextDisabled("|");
     ImGui::SameLine();

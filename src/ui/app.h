@@ -39,6 +39,7 @@ class App {
   [[nodiscard]] float compute_renderer_scale() const;
   [[nodiscard]] float compute_ui_scale() const;
   [[nodiscard]] std::vector<std::string> preferred_font_paths() const;
+  [[nodiscard]] bool create_renderer();
   void update_renderer_scale();
   void apply_ui_scale(float scale);
   void update_ui_scale_if_needed();
@@ -67,6 +68,7 @@ class App {
   float ui_scale_ = 1.0f;
   ImGuiStyle base_style_ = {};
   pixelscope::render::TextureCache texture_cache_;
+  std::string renderer_name_;
   std::string last_error_;
   HoverState hover_;
 };
