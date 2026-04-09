@@ -12,6 +12,12 @@ namespace pixelscope::io {
 namespace {
 
 #if defined(__linux__)
+enum class ZenityDialogResult {
+  kSelectedPath,
+  kCancelled,
+  kUnavailable,
+};
+
 struct PipeCloser {
   void operator()(FILE* file) const {
     if (file != nullptr) {
@@ -20,7 +26,12 @@ struct PipeCloser {
   }
 };
 
-std::optional<std::string> open_image_dialog_with_zenity() {
+struct ZenitySelection {
+  ZenityDialogResult result = ZenityDialogResult::kUnavailable;
+  std::optional<std::string> path;
+};
+
+ZenitySelection open_image_dialog_with_zenity() {
   constexpr const char* command =
       "zenity --file-selection "
       "--title='Open image' "
@@ -29,12 +40,12 @@ std::optional<std::string> open_image_dialog_with_zenity() {
 
   std::unique_ptr<FILE, PipeCloser> pipe(popen(command, "r"));
   if (!pipe) {
-    return std::nullopt;
+    return {};
   }
 
   std::array<char, 4096> buffer{};
   if (fgets(buffer.data(), static_cast<int>(buffer.size()), pipe.get()) == nullptr) {
-    return std::nullopt;
+    return {.result = ZenityDialogResult::kCancelled};
   }
 
   std::string path(buffer.data());
@@ -42,9 +53,12 @@ std::optional<std::string> open_image_dialog_with_zenity() {
     path.pop_back();
   }
   if (path.empty()) {
-    return std::nullopt;
+    return {.result = ZenityDialogResult::kCancelled};
   }
-  return path;
+  return {
+      .result = ZenityDialogResult::kSelectedPath,
+      .path = std::move(path),
+  };
 }
 #endif
 
@@ -52,8 +66,12 @@ std::optional<std::string> open_image_dialog_with_zenity() {
 
 std::optional<std::string> open_image_dialog() {
 #if defined(__linux__)
-  if (const auto path = open_image_dialog_with_zenity()) {
-    return path;
+  const auto zenity = open_image_dialog_with_zenity();
+  if (zenity.result == ZenityDialogResult::kSelectedPath) {
+    return zenity.path;
+  }
+  if (zenity.result == ZenityDialogResult::kCancelled) {
+    return std::nullopt;
   }
 #endif
 
