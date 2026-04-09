@@ -174,16 +174,38 @@ bool App::create_renderer() {
     return false;
   }
 
+#if defined(__APPLE__)
+  const std::vector<std::pair<const char*, std::uint32_t>> attempts = {
+      {"metal", SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC},
+      {"opengl", SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC},
+      {"opengles2", SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC},
+      {nullptr, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC},
+      {nullptr, SDL_RENDERER_ACCELERATED},
+      {"software", SDL_RENDERER_SOFTWARE},
+  };
+#elif defined(__linux__)
   const std::vector<std::pair<const char*, std::uint32_t>> attempts = {
       {"opengl", SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC},
       {"opengles2", SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC},
-      {"metal", SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC},
+      {nullptr, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC},
+      {nullptr, SDL_RENDERER_ACCELERATED},
+      {"software", SDL_RENDERER_SOFTWARE},
+  };
+#elif defined(_WIN32)
+  const std::vector<std::pair<const char*, std::uint32_t>> attempts = {
       {"direct3d11", SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC},
       {"direct3d", SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC},
       {nullptr, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC},
       {nullptr, SDL_RENDERER_ACCELERATED},
       {"software", SDL_RENDERER_SOFTWARE},
   };
+#else
+  const std::vector<std::pair<const char*, std::uint32_t>> attempts = {
+      {nullptr, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC},
+      {nullptr, SDL_RENDERER_ACCELERATED},
+      {"software", SDL_RENDERER_SOFTWARE},
+  };
+#endif
 
   std::string errors;
   for (const auto& [driver_name, flags] : attempts) {
