@@ -1,36 +1,39 @@
-Implement Phase 1 foundation for PixelScope.
+Implement the Phase 1 foundation for PixelScope.
 
 Context:
-- Read docs inside `docs/`
+- Review the documents in `docs/` before making changes.
 
-Task:
-- Add a toggle to show histogram. show histogram in a small overlay on lower left corner.
+Goal:
+- Add initial DNG image support. Reference implementation: https://github.com/CyberTimon/RapidRAW
+
+What success looks like:
+- PixelScope can load and display DNG files through a simple, testable path.
+- The implementation establishes the project foundation without overcommitting to a full RAW pipeline.
 
 Constraints:
-- Keep dependencies minimal
-- Keep modules separated: ui/, io/, core/, render/
-- Do not implement RAW yet
-- Use nearest-neighbor rendering only
-- Add a basic testable image model in core/
-- Update README with build instructions
+- Keep dependencies minimal.
+- Preserve clear module boundaries across `ui/`, `io/`, `core/`, and `render/`.
+- Do not implement a general RAW workflow yet; focus only on the minimum DNG support needed for Phase 1.
+- Use nearest-neighbor rendering only.
+- Add a basic, testable image model in `core/`.
+- Update the README with build instructions if they change or are missing.
 
 Deliverables:
-- code changes
-- brief architecture notes in docs/architecture.md if needed
-- a short list of follow-up tasks
+- Working code changes.
+- Brief architecture notes in `docs/architecture.md` if the implementation introduces new structure or decisions worth recording.
+- A short follow-up task list for the next phase.
 
 Coding style:
-- prefer explicit structs over deep inheritance
-- avoid singleton/global state
-- keep files under ~300 lines where practical
-- separate source data from display data
-- write obvious code, not framework magic
-- prefer boring, testable architecture
+- Prefer explicit structs over deep inheritance.
+- Avoid singleton or global state.
+- Keep files under roughly 300 lines where practical.
+- Separate source data from display data.
+- Choose straightforward, testable code over framework-heavy abstractions.
+- Favor boring, reliable architecture.
 
 Tech stack:
-- C++ + SDL/GLFW + Dear ImGui
+- C++ with SDL/GLFW and Dear ImGui.
 
-
-Implement the feature, then run the build and relevant tests.
+Finish by running the build and relevant tests.
 If something fails, fix it.
-Do not leave the repo in a broken state.
+Do not leave the repository in a broken state.

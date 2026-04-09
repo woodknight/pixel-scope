@@ -5,6 +5,10 @@ project(PixelScope VERSION 0.1.0 LANGUAGES CXX C)
 include(FetchContent)
 include(CTest)
 
+if(POLICY CMP0169)
+  cmake_policy(SET CMP0169 OLD)
+endif()
+
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -30,12 +34,22 @@ FetchContent_Declare(
 )
 
 FetchContent_Declare(
+  tinydng
+  GIT_REPOSITORY https://github.com/syoyo/tinydng.git
+  GIT_TAG f3b42f5bb1a3151036115f84ceabe2187e023243
+)
+
+FetchContent_Declare(
   tinyfiledialogs
   GIT_REPOSITORY https://github.com/native-toolkit/libtinyfiledialogs.git
   GIT_TAG master
 )
 
 FetchContent_MakeAvailable(sdl2 imgui stb tinyfiledialogs)
+FetchContent_GetProperties(tinydng)
+if(NOT tinydng_POPULATED)
+  FetchContent_Populate(tinydng)
+endif()
 
 add_library(imgui_lib STATIC
   ${imgui_SOURCE_DIR}/imgui.cpp
@@ -67,6 +81,7 @@ add_library(pixelscope_core STATIC
   src/core/image.cpp
   src/core/image_model.cpp
   src/core/viewport.cpp
+  src/io/dng_loader.cpp
   src/io/file_dialog.cpp
   src/io/image_loader.cpp
   src/render/texture_cache.cpp
@@ -75,6 +90,7 @@ add_library(pixelscope_core STATIC
 target_include_directories(pixelscope_core PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/src
   ${stb_SOURCE_DIR}
+  ${tinydng_SOURCE_DIR}
 )
 target_link_libraries(pixelscope_core PUBLIC SDL2::SDL2 imgui_lib tinyfiledialogs_lib)
 

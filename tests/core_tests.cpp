@@ -7,6 +7,7 @@
 #include "core/image.h"
 #include "core/image_model.h"
 #include "core/viewport.h"
+#include "io/dng_loader.h"
 
 int main() {
   {
@@ -184,6 +185,56 @@ int main() {
     assert(model.pick_display_level(0.6f)->downsample_factor == 2);
     assert(model.pick_display_level(0.3f)->downsample_factor == 4);
     assert(model.pick_display_level(0.1f)->downsample_factor == 4);
+  }
+
+  {
+    pixelscope::io::DngFrame frame{
+        .width = 2,
+        .height = 1,
+        .samples_per_pixel = 1,
+        .bits_per_sample = 16,
+        .black_levels = {64, 0, 0, 0},
+        .white_levels = {1087, -1, -1, -1},
+        .decoded_bytes =
+            {
+                64, 0,
+                87, 4,
+            },
+    };
+    const auto image = pixelscope::io::rgba8_image_from_dng_frame(frame, "mono.dng");
+    assert(image.valid());
+    assert(image.metadata().bits_per_channel == 16);
+    assert(image.pixel_at(0, 0)->r == 0);
+    assert(image.pixel_at(0, 0)->g == 0);
+    assert(image.pixel_at(0, 0)->b == 0);
+    assert(image.pixel_at(1, 0)->r == 255);
+    assert(image.pixel_at(1, 0)->g == 255);
+    assert(image.pixel_at(1, 0)->b == 255);
+  }
+
+  {
+    pixelscope::io::DngFrame frame{
+        .width = 1,
+        .height = 1,
+        .samples_per_pixel = 3,
+        .bits_per_sample = 16,
+        .black_levels = {0, 128, 64, 0},
+        .white_levels = {1023, 1151, 1087, -1},
+        .decoded_bytes =
+            {
+                0, 2,
+                128, 2,
+                64, 2,
+            },
+    };
+    const auto image = pixelscope::io::rgba8_image_from_dng_frame(frame, "rgb.dng");
+    assert(image.valid());
+    const auto pixel = image.pixel_at(0, 0);
+    assert(pixel.has_value());
+    assert(pixel->r == 128);
+    assert(pixel->g == 128);
+    assert(pixel->b == 128);
+    assert(pixel->a == 255);
   }
 
   return 0;
