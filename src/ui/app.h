@@ -32,8 +32,10 @@ class App {
 
   bool load_image(const std::string& path);
   void fit_image_to_canvas(float width, float height);
+  [[nodiscard]] float compute_renderer_scale() const;
   [[nodiscard]] float compute_ui_scale() const;
   [[nodiscard]] std::vector<std::string> preferred_font_paths() const;
+  void update_renderer_scale();
   void apply_ui_scale(float scale);
   void update_ui_scale_if_needed();
   void process_event(const SDL_Event& event, bool& running, bool& request_open_dialog);
@@ -49,6 +51,7 @@ class App {
   pixelscope::core::ImageData image_;
   pixelscope::core::ViewState view_;
   bool view_initialized_ = false;
+  float renderer_scale_ = 1.0f;
   float ui_scale_ = 1.0f;
   ImGuiStyle base_style_ = {};
   pixelscope::render::TextureCache texture_cache_;

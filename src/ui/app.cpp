@@ -85,6 +85,7 @@ bool App::initialize() {
 
   ImGui_ImplSDL2_InitForSDLRenderer(window_, renderer_);
   ImGui_ImplSDLRenderer2_Init(renderer_);
+  update_renderer_scale();
   apply_ui_scale(compute_ui_scale());
 
   if (initial_path_) {
@@ -108,6 +109,7 @@ int App::run() {
       process_event(event, running, request_open_dialog);
     }
 
+    update_renderer_scale();
     update_ui_scale_if_needed();
 
     if (request_open_dialog) {
@@ -158,22 +160,32 @@ void App::fit_image_to_canvas(float width, float height) {
   view_initialized_ = true;
 }
 
-float App::compute_ui_scale() const {
+float App::compute_renderer_scale() const {
   if (window_ == nullptr || renderer_ == nullptr) {
     return 1.0f;
   }
 
-  float pixel_ratio_scale = 1.0f;
   int window_width = 0;
   int window_height = 0;
   int output_width = 0;
   int output_height = 0;
   SDL_GetWindowSize(window_, &window_width, &window_height);
-  if (SDL_GetRendererOutputSize(renderer_, &output_width, &output_height) == 0 &&
-      window_width > 0 && window_height > 0) {
-    const float scale_x = static_cast<float>(output_width) / static_cast<float>(window_width);
-    const float scale_y = static_cast<float>(output_height) / static_cast<float>(window_height);
-    pixel_ratio_scale = std::max(scale_x, scale_y);
+  if (window_width <= 0 || window_height <= 0) {
+    return 1.0f;
+  }
+  if (SDL_GetRendererOutputSize(renderer_, &output_width, &output_height) != 0 ||
+      output_width <= 0 || output_height <= 0) {
+    return 1.0f;
+  }
+
+  const float scale_x = static_cast<float>(output_width) / static_cast<float>(window_width);
+  const float scale_y = static_cast<float>(output_height) / static_cast<float>(window_height);
+  return std::max(1.0f, std::max(scale_x, scale_y));
+}
+
+float App::compute_ui_scale() const {
+  if (window_ == nullptr || renderer_ == nullptr) {
+    return 1.0f;
   }
 
   float dpi_scale = 1.0f;
@@ -185,7 +197,7 @@ float App::compute_ui_scale() const {
     }
   }
 
-  return std::clamp(std::max(pixel_ratio_scale, dpi_scale), 1.0f, 3.0f);
+  return std::clamp(std::max(compute_renderer_scale(), dpi_scale), 1.0f, 3.0f);
 }
 
 std::vector<std::string> App::preferred_font_paths() const {
@@ -233,6 +245,14 @@ void App::apply_ui_scale(float scale) {
   ImGui_ImplSDLRenderer2_DestroyFontsTexture();
   ImGui_ImplSDLRenderer2_CreateFontsTexture();
   ui_scale_ = scale;
+}
+
+void App::update_renderer_scale() {
+  const float next_scale = compute_renderer_scale();
+  if (std::fabs(next_scale - renderer_scale_) > 0.01f) {
+    SDL_RenderSetScale(renderer_, next_scale, next_scale);
+    renderer_scale_ = next_scale;
+  }
 }
 
 void App::update_ui_scale_if_needed() {
