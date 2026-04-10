@@ -22,6 +22,14 @@ struct ImageModel {
 };
 
 [[nodiscard]] ImageData downsample_nearest_2x(const ImageData& source);
+[[nodiscard]] ImageData apply_auto_contrast(
+    const ImageData& source,
+    double shadow_clip_percent = 0.01,
+    double highlight_clip_percent = 0.01);
 [[nodiscard]] ImageModel build_image_model(ImageData source, int max_display_dimension = 2048);
+[[nodiscard]] ImageModel build_auto_contrast_image_model(
+    const ImageModel& source_model,
+    double shadow_clip_percent = 0.01,
+    double highlight_clip_percent = 0.01);
 
 }  // namespace pixelscope::core

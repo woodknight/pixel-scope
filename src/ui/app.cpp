@@ -390,6 +390,7 @@ bool App::load_image(
   }
 
   image_model_ = pixelscope::core::build_image_model(std::move(result.image));
+  rebuild_render_image_model();
   histogram_ = {};
   histogram_ready_ = false;
   statistics_ = {};
@@ -531,6 +532,7 @@ void App::refresh_raw_bayer_rendering() {
 
   image_model_ = pixelscope::core::build_image_model(
       pixelscope::io::render_raw_bayer_image(source, show_raw_cfa_colors_));
+  rebuild_render_image_model();
   histogram_ = {};
   histogram_ready_ = false;
   statistics_ = {};
@@ -777,6 +779,10 @@ void App::draw_menu(bool& request_open_dialog) {
         pixel_grid_manually_disabled_ = true;
       }
     }
+    if (ImGui::MenuItem("Auto Contrast", nullptr, &auto_contrast_enabled_, has_image)) {
+      rebuild_render_image_model();
+      texture_cache_.clear();
+    }
     if (ImGui::MenuItem("RAW CFA Colors", nullptr, &show_raw_cfa_colors_, has_raw_bayer_image)) {
       refresh_raw_bayer_rendering();
     }
@@ -813,8 +819,9 @@ void App::draw_canvas() {
     fit_image_to_canvas(canvas_size.x, canvas_size.y);
   }
 
-  const pixelscope::core::ImageData* display_image = &source_image;
-  if (const auto* level = image_model_.pick_display_level(view_.zoom)) {
+  const auto& render_model = active_render_image_model();
+  const pixelscope::core::ImageData* display_image = &render_model.source;
+  if (const auto* level = render_model.pick_display_level(view_.zoom)) {
     display_image = &level->image;
   }
 
@@ -1049,6 +1056,10 @@ void App::draw_status_bar() {
     ImGui::TextDisabled("|");
     ImGui::SameLine();
     ImGui::Text("Zoom %.2fx", view_.zoom);
+    ImGui::SameLine();
+    ImGui::TextDisabled("|");
+    ImGui::SameLine();
+    ImGui::Text("Auto Contrast %s", auto_contrast_enabled_ ? "On" : "Off");
     if (!renderer_name_.empty()) {
       ImGui::SameLine();
       ImGui::TextDisabled("|");
@@ -1060,6 +1071,26 @@ void App::draw_status_bar() {
   } else {
     ImGui::TextUnformatted("No image loaded");
   }
+}
+
+void App::rebuild_render_image_model() {
+  if (!image_model_.valid()) {
+    render_image_model_ = {};
+    return;
+  }
+
+  if (auto_contrast_enabled_) {
+    render_image_model_ = pixelscope::core::build_auto_contrast_image_model(image_model_);
+  } else {
+    render_image_model_ = {};
+  }
+}
+
+const pixelscope::core::ImageModel& App::active_render_image_model() const {
+  if (auto_contrast_enabled_ && render_image_model_.valid()) {
+    return render_image_model_;
+  }
+  return image_model_;
 }
 
 void App::reset_hover() { hover_ = {}; }

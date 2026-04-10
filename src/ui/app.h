@@ -72,6 +72,8 @@ class App {
   void draw_statistics_overlay(const pixelscope::core::Rect& canvas_rect);
   void draw_status_bar();
   void refresh_raw_bayer_rendering();
+  void rebuild_render_image_model();
+  [[nodiscard]] const pixelscope::core::ImageModel& active_render_image_model() const;
   void reset_hover();
   void maybe_enable_pixel_grid_for_zoom();
 
@@ -90,10 +92,12 @@ class App {
   bool show_pixel_grid_ = false;
   bool pixel_grid_manually_disabled_ = false;
   bool show_raw_cfa_colors_ = false;
+  bool auto_contrast_enabled_ = false;
   int open_dialog_delay_frames_ = 0;
   float renderer_scale_ = 1.0f;
   float ui_scale_ = 1.0f;
   ImGuiStyle base_style_ = {};
+  pixelscope::core::ImageModel render_image_model_;
   pixelscope::render::TextureCache texture_cache_;
   std::string renderer_name_;
   std::string last_error_;
