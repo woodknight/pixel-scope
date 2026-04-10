@@ -344,7 +344,6 @@ bool App::create_renderer() {
       renderer_name_ = "unknown";
     }
 
-    SDL_Log("PixelScope renderer: %s", renderer_name_.c_str());
     return true;
   }
 
