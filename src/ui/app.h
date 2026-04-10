@@ -47,6 +47,7 @@ class App {
   void draw_ui(bool& request_open_dialog);
   void draw_menu(bool& request_open_dialog);
   void draw_canvas();
+  void draw_hover_overlay(const ImVec2& canvas_pos);
   void draw_histogram_overlay(const pixelscope::core::Rect& canvas_rect);
   void draw_status_bar();
   void refresh_dng_rendering();

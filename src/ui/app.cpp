@@ -27,6 +27,7 @@ constexpr float kGridMinZoom = 8.0f;
 constexpr float kHistogramOverlayWidth = 240.0f;
 constexpr float kHistogramOverlayHeight = 128.0f;
 constexpr float kHistogramOverlayMargin = 16.0f;
+constexpr float kHoverOverlayMargin = 16.0f;
 constexpr int kMaxGridLinesPerAxis = 4096;
 
 pixelscope::core::Rect to_rect(const ImVec2& min, const ImVec2& size) {
@@ -494,6 +495,8 @@ void App::draw_ui(bool& request_open_dialog) {
   draw_canvas();
   ImGui::End();
 
+  draw_hover_overlay(ImVec2(viewport_pos.x, viewport_pos.y + menu_height));
+
   ImGui::SetNextWindowPos(ImVec2(viewport_pos.x, viewport_pos.y + menu_height + canvas_height));
   ImGui::SetNextWindowSize(ImVec2(viewport_size.x, status_bar_height));
   ImGuiWindowFlags status_flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
@@ -658,6 +661,45 @@ void App::draw_canvas() {
   ImGui::EndChild();
 }
 
+void App::draw_hover_overlay(const ImVec2& canvas_pos) {
+  if (!image_model_.valid()) {
+    return;
+  }
+
+  const auto& source_image = image_model_.source;
+  const float margin = kHoverOverlayMargin * ui_scale_;
+  ImGui::SetNextWindowPos(ImVec2(canvas_pos.x + margin, canvas_pos.y + margin), ImGuiCond_Always);
+  ImGui::SetNextWindowBgAlpha(0.86f);
+
+  ImGuiWindowFlags overlay_flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
+                                   ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing |
+                                   ImGuiWindowFlags_NoNav | ImGuiWindowFlags_AlwaysAutoResize;
+  ImGui::Begin("HoverOverlay", nullptr, overlay_flags);
+
+  ImGui::TextUnformatted("Pixel");
+  ImGui::Separator();
+  if (hover_.active) {
+    ImGui::Text("Coord: (%d, %d)", hover_.x, hover_.y);
+    if (source_image.metadata().is_raw_bayer_plane && hover_.raw_sample.has_value()) {
+      ImGui::Text(
+          "Value: %s RAW [%u] Gray [%u]",
+          cfa_label(source_image.metadata(), hover_.x, hover_.y),
+          hover_.raw_sample.value(),
+          raw_sample_display_value(hover_.raw_sample.value(), source_image.metadata().bits_per_channel));
+    } else if (hover_.pixel16.has_value()) {
+      ImGui::Text(
+          "Value: RGB16 [%u, %u, %u]", hover_.pixel16->r, hover_.pixel16->g, hover_.pixel16->b);
+    } else {
+      ImGui::Text("Value: RGB [%u, %u, %u]", hover_.pixel.r, hover_.pixel.g, hover_.pixel.b);
+    }
+  } else {
+    ImGui::TextUnformatted("Coord: (-, -)");
+    ImGui::TextUnformatted("Value: -");
+  }
+
+  ImGui::End();
+}
+
 void App::draw_histogram_overlay(const pixelscope::core::Rect& canvas_rect) {
   if (!show_histogram_) {
     return;
@@ -735,35 +777,6 @@ void App::draw_status_bar() {
       ImGui::TextDisabled("|");
       ImGui::SameLine();
       ImGui::Text("Renderer %s", renderer_name_.c_str());
-    }
-    ImGui::SameLine();
-    ImGui::TextDisabled("|");
-    ImGui::SameLine();
-    if (hover_.active) {
-      if (source_image.metadata().is_raw_bayer_plane && hover_.raw_sample.has_value()) {
-        ImGui::Text("Pixel (%d, %d) %s RAW [%u] Gray [%u]",
-            hover_.x,
-            hover_.y,
-            cfa_label(source_image.metadata(), hover_.x, hover_.y),
-            hover_.raw_sample.value(),
-            raw_sample_display_value(hover_.raw_sample.value(), source_image.metadata().bits_per_channel));
-      } else if (hover_.pixel16.has_value()) {
-        ImGui::Text("Pixel (%d, %d) RGB16 [%u, %u, %u]",
-            hover_.x,
-            hover_.y,
-            hover_.pixel16->r,
-            hover_.pixel16->g,
-            hover_.pixel16->b);
-      } else {
-        ImGui::Text("Pixel (%d, %d) RGB [%u, %u, %u]",
-            hover_.x,
-            hover_.y,
-            hover_.pixel.r,
-            hover_.pixel.g,
-            hover_.pixel.b);
-      }
-    } else {
-      ImGui::TextUnformatted("Pixel (-, -)");
     }
   } else if (!last_error_.empty()) {
     ImGui::TextColored(ImVec4(0.92f, 0.38f, 0.38f, 1.0f), "%s", last_error_.c_str());
