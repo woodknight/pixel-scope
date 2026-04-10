@@ -144,6 +144,10 @@ const char* statistics_value_label(const pixelscope::core::ImageStatistics& stat
   return "Luma";
 }
 
+bool image_has_alpha_channel(const pixelscope::core::ImageMetadata& metadata) {
+  return metadata.original_channel_count == 2 || metadata.original_channel_count == 4;
+}
+
 void draw_statistics_row(const char* label, const char* value) {
   ImGui::TextUnformatted(label);
   ImGui::SameLine(120.0f * ImGui::GetIO().FontGlobalScale);
@@ -961,10 +965,23 @@ void App::draw_hover_overlay(const ImVec2& canvas_pos) {
           hover_.raw_sample.value(),
           raw_sample_display_value(hover_.raw_sample.value(), source_image.metadata().bits_per_channel));
     } else if (hover_.pixel16.has_value()) {
-      ImGui::Text(
-          "Value: RGB16 [%u, %u, %u]", hover_.pixel16->r, hover_.pixel16->g, hover_.pixel16->b);
+      if (image_has_alpha_channel(source_image.metadata())) {
+        ImGui::Text(
+            "Value: RGBA16 [%u, %u, %u, %u]",
+            hover_.pixel16->r,
+            hover_.pixel16->g,
+            hover_.pixel16->b,
+            hover_.pixel16->a);
+      } else {
+        ImGui::Text(
+            "Value: RGB16 [%u, %u, %u]", hover_.pixel16->r, hover_.pixel16->g, hover_.pixel16->b);
+      }
     } else {
-      ImGui::Text("Value: RGB [%u, %u, %u]", hover_.pixel.r, hover_.pixel.g, hover_.pixel.b);
+      if (image_has_alpha_channel(source_image.metadata())) {
+        ImGui::Text("Value: RGBA [%u, %u, %u, %u]", hover_.pixel.r, hover_.pixel.g, hover_.pixel.b, hover_.pixel.a);
+      } else {
+        ImGui::Text("Value: RGB [%u, %u, %u]", hover_.pixel.r, hover_.pixel.g, hover_.pixel.b);
+      }
     }
   } else {
     ImGui::TextUnformatted("Coord: (-, -)");
