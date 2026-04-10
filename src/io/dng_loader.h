@@ -22,9 +22,18 @@ struct DngFrame {
   int samples_per_pixel = 0;
   int bits_per_sample = 0;
   int original_bits_per_sample = 0;
+  int orientation = 0;
   std::array<int, 4> cfa_pattern = {-1, -1, -1, -1};
   std::array<int, 4> black_levels = {0, 0, 0, 0};
   std::array<int, 4> white_levels = {-1, -1, -1, -1};
+  std::array<float, 4> wb_coeffs = {0.0f, 0.0f, 0.0f, 0.0f};
+  std::array<int, 4> crops = {0, 0, 0, 0};
+  std::array<float, 12> xyz_to_cam = {};
+  std::string make;
+  std::string model;
+  std::string clean_make;
+  std::string clean_model;
+  std::vector<pixelscope::core::MetadataEntry> metadata_entries;
   std::vector<std::uint8_t> decoded_bytes;
 };
 

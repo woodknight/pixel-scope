@@ -23,6 +23,11 @@ struct PixelRgba16 {
   std::uint16_t a = 65535;
 };
 
+struct MetadataEntry {
+  std::string label;
+  std::string value;
+};
+
 struct ImageMetadata {
   int width = 0;
   int height = 0;
@@ -30,6 +35,7 @@ struct ImageMetadata {
   int bits_per_channel = 8;
   bool is_raw_bayer_plane = false;
   std::array<int, 4> cfa_pattern = {-1, -1, -1, -1};
+  std::vector<MetadataEntry> metadata_entries;
   std::string source_path;
 };
 

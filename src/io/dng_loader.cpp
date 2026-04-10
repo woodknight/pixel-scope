@@ -7,8 +7,10 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <cmath>
 #include <filesystem>
 #include <fstream>
+#include <iomanip>
 #include <limits>
 #include <sstream>
 #include <string>
@@ -57,10 +59,147 @@ std::uint64_t read_u64_le(std::ifstream& stream, bool& ok) {
   return value;
 }
 
+float read_f32_le(std::ifstream& stream, bool& ok) {
+  float value = 0.0f;
+  ok = read_value(stream, value);
+  return value;
+}
+
 std::int32_t read_i32_le(std::ifstream& stream, bool& ok) {
   std::int32_t value = 0;
   ok = read_value(stream, value);
   return value;
+}
+
+std::string read_string(std::ifstream& stream, bool& ok) {
+  const auto size = read_u32_le(stream, ok);
+  if (!ok) {
+    return {};
+  }
+
+  std::string value(size, '\0');
+  if (size > 0) {
+    stream.read(value.data(), static_cast<std::streamsize>(size));
+    ok = stream.good();
+  }
+  return value;
+}
+
+std::string format_float(float value, int precision = 4) {
+  if (!std::isfinite(value)) {
+    return "-";
+  }
+
+  std::ostringstream stream;
+  stream << std::fixed << std::setprecision(precision) << value;
+  std::string formatted = stream.str();
+  while (!formatted.empty() && formatted.back() == '0') {
+    formatted.pop_back();
+  }
+  if (!formatted.empty() && formatted.back() == '.') {
+    formatted.pop_back();
+  }
+  if (formatted.empty()) {
+    return "0";
+  }
+  return formatted;
+}
+
+std::string format_channel_levels(const std::array<int, 4>& values) {
+  std::ostringstream stream;
+  stream << "R " << values[0] << " | G1 " << values[1] << " | B " << values[2] << " | G2 " << values[3];
+  return stream.str();
+}
+
+std::string format_cfa_pattern(const std::array<int, 4>& pattern) {
+  const auto channel_name = [](int channel) {
+    switch (channel) {
+      case 0:
+        return 'R';
+      case 1:
+        return 'G';
+      case 2:
+        return 'B';
+      default:
+        return '?';
+    }
+  };
+
+  std::string label;
+  label.reserve(4);
+  for (int channel : pattern) {
+    label.push_back(channel_name(channel));
+  }
+  return label;
+}
+
+std::string format_wb_coeffs(const std::array<float, 4>& values) {
+  std::ostringstream stream;
+  stream << "R " << format_float(values[0]) << " | G1 " << format_float(values[1]) << " | B " << format_float(values[2]);
+  if (std::isfinite(values[3]) && values[3] > 0.0f) {
+    stream << " | G2 " << format_float(values[3]);
+  }
+  return stream.str();
+}
+
+std::string format_crop_values(const std::array<int, 4>& crops) {
+  std::ostringstream stream;
+  stream << "Top " << crops[0] << " | Right " << crops[1] << " | Bottom " << crops[2] << " | Left " << crops[3];
+  return stream.str();
+}
+
+const char* orientation_label(int orientation) {
+  switch (orientation) {
+    case 1:
+      return "Normal";
+    case 2:
+      return "Mirror Horizontal";
+    case 3:
+      return "Rotate 180";
+    case 4:
+      return "Mirror Vertical";
+    case 5:
+      return "Mirror Horizontal + Rotate 270 CW";
+    case 6:
+      return "Rotate 90 CW";
+    case 7:
+      return "Mirror Horizontal + Rotate 90 CW";
+    case 8:
+      return "Rotate 270 CW";
+    default:
+      return "Unknown";
+  }
+}
+
+std::vector<pixelscope::core::MetadataEntry> build_dng_metadata_entries(const DngFrame& frame) {
+  std::vector<pixelscope::core::MetadataEntry> entries;
+  entries.reserve(frame.metadata_entries.size() + 12);
+
+  const auto push_if_value = [&](std::string label, const std::string& value) {
+    if (!value.empty()) {
+      entries.push_back({.label = std::move(label), .value = value});
+    }
+  };
+
+  push_if_value("Camera Make", frame.make);
+  push_if_value("Camera Model", frame.model);
+  if (!frame.clean_make.empty() || !frame.clean_model.empty()) {
+    push_if_value("Camera", frame.clean_make + (frame.clean_make.empty() || frame.clean_model.empty() ? "" : " ") + frame.clean_model);
+  }
+  push_if_value("CFA Pattern", format_cfa_pattern(frame.cfa_pattern));
+  push_if_value("AWB Gains", format_wb_coeffs(frame.wb_coeffs));
+  push_if_value("Black Levels", format_channel_levels(frame.black_levels));
+  push_if_value("White Levels", format_channel_levels(frame.white_levels));
+  push_if_value("Crop", format_crop_values(frame.crops));
+  push_if_value("Orientation", orientation_label(frame.orientation));
+
+  for (const auto& entry : frame.metadata_entries) {
+    if (!entry.label.empty() && !entry.value.empty()) {
+      entries.push_back(entry);
+    }
+  }
+
+  return entries;
 }
 
 int fallback_white_level(int bits_per_sample) {
@@ -90,6 +229,19 @@ std::uint8_t raw_plane_to_u8(std::uint32_t sample, int original_bits_per_sample)
   }
   const int shift = bits - 8;
   return static_cast<std::uint8_t>(std::min<std::uint32_t>(sample >> shift, 255));
+}
+
+std::uint8_t normalize_raw_plane_to_u8(std::uint16_t sample, std::uint16_t black_level, std::uint16_t white_level) {
+  if (white_level <= black_level) {
+    return raw_plane_to_u8(sample, 16);
+  }
+
+  const std::uint32_t numerator = std::clamp<std::uint32_t>(
+      static_cast<std::uint32_t>(sample) - static_cast<std::uint32_t>(black_level),
+      0U,
+      static_cast<std::uint32_t>(white_level) - static_cast<std::uint32_t>(black_level));
+  const std::uint32_t denominator = static_cast<std::uint32_t>(white_level) - static_cast<std::uint32_t>(black_level);
+  return static_cast<std::uint8_t>((numerator * 255U + (denominator / 2U)) / denominator);
 }
 
 pixelscope::core::PixelRgba8 cfa_mosaic_pixel(
@@ -257,7 +409,7 @@ bool load_frame_from_payload(const std::filesystem::path& payload_path, DngFrame
 
   bool ok = true;
   const auto version = read_u32_le(stream, ok);
-  if (!ok || version != 1) {
+  if (!ok || (version != 1 && version != 2)) {
     error_message = "PixelScope received an unsupported rawloader payload version.";
     return false;
   }
@@ -288,6 +440,40 @@ bool load_frame_from_payload(const std::filesystem::path& payload_path, DngFrame
   if (!ok) {
     error_message = "PixelScope could not read the rawloader payload levels.";
     return false;
+  }
+
+  if (version >= 2) {
+    frame.orientation = static_cast<int>(read_u32_le(stream, ok));
+    for (auto& value : frame.wb_coeffs) {
+      value = read_f32_le(stream, ok);
+    }
+    for (auto& value : frame.crops) {
+      value = static_cast<int>(read_u32_le(stream, ok));
+    }
+    for (auto& value : frame.xyz_to_cam) {
+      value = read_f32_le(stream, ok);
+    }
+    frame.make = read_string(stream, ok);
+    frame.model = read_string(stream, ok);
+    frame.clean_make = read_string(stream, ok);
+    frame.clean_model = read_string(stream, ok);
+    const auto metadata_entry_count = read_u32_le(stream, ok);
+    if (!ok) {
+      error_message = "PixelScope could not read the rawloader metadata block.";
+      return false;
+    }
+
+    frame.metadata_entries.clear();
+    frame.metadata_entries.reserve(static_cast<std::size_t>(metadata_entry_count));
+    for (std::uint32_t index = 0; index < metadata_entry_count; ++index) {
+      auto label = read_string(stream, ok);
+      auto value = read_string(stream, ok);
+      if (!ok) {
+        error_message = "PixelScope could not read a rawloader metadata entry.";
+        return false;
+      }
+      frame.metadata_entries.push_back({.label = std::move(label), .value = std::move(value)});
+    }
   }
 
   const auto sample_count = read_u64_le(stream, ok);
@@ -408,6 +594,7 @@ pixelscope::core::ImageData rgba8_image_from_dng_frame(
         .bits_per_channel = frame.original_bits_per_sample > 0 ? frame.original_bits_per_sample : frame.bits_per_sample,
         .is_raw_bayer_plane = true,
         .cfa_pattern = frame.cfa_pattern,
+        .metadata_entries = build_dng_metadata_entries(frame),
         .source_path = source_path,
     };
     return make_raw_bayer_image(std::move(metadata), std::move(raw_samples), true);
@@ -420,6 +607,7 @@ pixelscope::core::ImageData rgba8_image_from_dng_frame(
       .bits_per_channel = frame.original_bits_per_sample > 0 ? frame.original_bits_per_sample : frame.bits_per_sample,
       .is_raw_bayer_plane = false,
       .cfa_pattern = frame.cfa_pattern,
+      .metadata_entries = build_dng_metadata_entries(frame),
       .source_path = source_path,
   };
   return pixelscope::core::ImageData(
@@ -442,13 +630,18 @@ pixelscope::core::ImageData render_raw_bayer_image(
     return source;
   }
 
+  auto [min_sample_it, max_sample_it] = std::minmax_element(raw_samples.begin(), raw_samples.end());
+  const std::uint16_t observed_black = min_sample_it != raw_samples.end() ? *min_sample_it : 0;
+  const std::uint16_t observed_white = max_sample_it != raw_samples.end() ? *max_sample_it : 0;
+
   std::vector<std::uint8_t> rgba_pixels(static_cast<std::size_t>(metadata.width * metadata.height * 4), 255);
   const std::size_t pixel_count = static_cast<std::size_t>(metadata.width) * static_cast<std::size_t>(metadata.height);
   for (std::size_t pixel_index = 0; pixel_index < pixel_count; ++pixel_index) {
     const std::size_t output_base = pixel_index * 4;
     const int x = static_cast<int>(pixel_index % static_cast<std::size_t>(metadata.width));
     const int y = static_cast<int>(pixel_index / static_cast<std::size_t>(metadata.width));
-    const std::uint8_t value = raw_plane_to_u8(raw_samples[pixel_index], metadata.bits_per_channel);
+    const std::uint8_t value =
+        normalize_raw_plane_to_u8(raw_samples[pixel_index], observed_black, observed_white);
     const auto pixel = use_cfa_colors
                            ? cfa_mosaic_pixel(value, metadata.cfa_pattern, x, y)
                            : pixelscope::core::PixelRgba8{.r = value, .g = value, .b = value, .a = 255};

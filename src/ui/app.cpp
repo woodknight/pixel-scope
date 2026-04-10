@@ -6,6 +6,7 @@
 #include <cmath>
 #include <cstdio>
 #include <filesystem>
+#include <limits>
 #include <optional>
 #include <string>
 #include <utility>
@@ -32,6 +33,8 @@ constexpr float kHistogramOverlayHeight = 128.0f;
 constexpr float kHistogramOverlayMargin = 16.0f;
 constexpr float kHoverOverlayMargin = 16.0f;
 constexpr float kStatisticsOverlayWidth = 260.0f;
+constexpr float kMetadataOverlayWidth = 360.0f;
+constexpr float kMetadataOverlayMaxHeight = 420.0f;
 constexpr int kMaxGridLinesPerAxis = 4096;
 constexpr const char* kRawImportPopupName = "Import Binary Bayer Raw";
 
@@ -140,6 +143,18 @@ void draw_statistics_row(const char* label, const char* value) {
   ImGui::TextUnformatted(label);
   ImGui::SameLine(120.0f * ImGui::GetIO().FontGlobalScale);
   ImGui::TextUnformatted(value);
+}
+
+void draw_metadata_row(const char* label, const std::string& value) {
+  if (label == nullptr || value.empty()) {
+    return;
+  }
+
+  ImGui::TextUnformatted(label);
+  ImGui::SameLine(140.0f * ImGui::GetIO().FontGlobalScale);
+  ImGui::PushTextWrapPos();
+  ImGui::TextUnformatted(value.c_str());
+  ImGui::PopTextWrapPos();
 }
 
 void draw_pixel_grid_overlay(
@@ -771,6 +786,7 @@ void App::draw_menu(bool& request_open_dialog) {
       statistics_ = pixelscope::core::compute_image_statistics(image_model_.source);
       statistics_ready_ = true;
     }
+    ImGui::MenuItem("Metadata Overlay", nullptr, &show_metadata_overlay_, has_image);
     const bool pixel_grid_enabled_before = show_pixel_grid_;
     if (ImGui::MenuItem("Pixel Grid", nullptr, &show_pixel_grid_, has_image)) {
       if (show_pixel_grid_) {
@@ -897,6 +913,7 @@ void App::draw_canvas() {
 
   draw_histogram_overlay(canvas_rect);
   draw_statistics_overlay(canvas_rect);
+  draw_metadata_overlay(canvas_rect);
 
   ImGui::EndChild();
 }
@@ -1044,6 +1061,56 @@ void App::draw_statistics_overlay(const pixelscope::core::Rect& canvas_rect) {
   ImGui::Text("Mean: %s", mean_value);
   ImGui::Text("P90: %u", statistics_.percentile_90);
   ImGui::Text("Max: %u", statistics_.max_value);
+
+  ImGui::End();
+}
+
+void App::draw_metadata_overlay(const pixelscope::core::Rect& canvas_rect) {
+  if (!show_metadata_overlay_ || !image_model_.valid()) {
+    return;
+  }
+
+  const auto& metadata = image_model_.source.metadata();
+  const bool has_extra_metadata = !metadata.metadata_entries.empty();
+  if (!has_extra_metadata && metadata.source_path.empty()) {
+    return;
+  }
+
+  const float margin = kHistogramOverlayMargin * ui_scale_;
+  const float width = kMetadataOverlayWidth * ui_scale_;
+  const float max_height = std::min(
+      kMetadataOverlayMaxHeight * ui_scale_,
+      std::max(180.0f * ui_scale_, canvas_rect.h - (margin * 2.0f)));
+  const float right_offset = show_statistics_ ? (kStatisticsOverlayWidth * ui_scale_) + margin : 0.0f;
+  const ImVec2 overlay_pos(
+      canvas_rect.x + canvas_rect.w - width - margin - right_offset,
+      canvas_rect.y + margin);
+
+  ImGui::SetNextWindowPos(overlay_pos, ImGuiCond_Always);
+  ImGui::SetNextWindowSize(ImVec2(width, max_height), ImGuiCond_Always);
+  ImGui::SetNextWindowBgAlpha(0.88f);
+
+  ImGuiWindowFlags overlay_flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
+                                   ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing |
+                                   ImGuiWindowFlags_NoNav;
+  ImGui::Begin("MetadataOverlay", nullptr, overlay_flags);
+
+  ImGui::TextUnformatted("Metadata");
+  ImGui::Separator();
+  draw_metadata_row("Path", metadata.source_path);
+  draw_metadata_row("Dimensions", std::to_string(metadata.width) + " x " + std::to_string(metadata.height));
+  draw_metadata_row("Bit Depth", std::to_string(metadata.bits_per_channel));
+  draw_metadata_row("Channels", std::to_string(metadata.original_channel_count));
+  draw_metadata_row("Format", metadata.is_raw_bayer_plane ? "RAW Bayer" : "RGBA");
+
+  if (has_extra_metadata) {
+    ImGui::Spacing();
+    ImGui::BeginChild("MetadataOverlayScroll", ImVec2(0.0f, 0.0f), false, ImGuiWindowFlags_HorizontalScrollbar);
+    for (const auto& entry : metadata.metadata_entries) {
+      draw_metadata_row(entry.label.c_str(), entry.value);
+    }
+    ImGui::EndChild();
+  }
 
   ImGui::End();
 }

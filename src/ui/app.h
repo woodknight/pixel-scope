@@ -70,6 +70,7 @@ class App {
   void draw_hover_overlay(const ImVec2& canvas_pos);
   void draw_histogram_overlay(const pixelscope::core::Rect& canvas_rect);
   void draw_statistics_overlay(const pixelscope::core::Rect& canvas_rect);
+  void draw_metadata_overlay(const pixelscope::core::Rect& canvas_rect);
   void draw_status_bar();
   void refresh_raw_bayer_rendering();
   void rebuild_render_image_model();
@@ -89,6 +90,7 @@ class App {
   bool statistics_ready_ = false;
   bool show_histogram_ = false;
   bool show_statistics_ = false;
+  bool show_metadata_overlay_ = false;
   bool show_pixel_grid_ = false;
   bool pixel_grid_manually_disabled_ = false;
   bool show_raw_cfa_colors_ = false;
