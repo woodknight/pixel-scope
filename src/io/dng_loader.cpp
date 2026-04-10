@@ -1,4 +1,5 @@
 #include "io/dng_loader.h"
+#include "io/metadata_loader.h"
 
 #include <algorithm>
 #include <array>
@@ -668,6 +669,14 @@ DngLoadResult load_dng_file(const std::string& path) {
   if (!image.valid()) {
     return {.error_message = "rawloader decode succeeded, but PixelScope could not convert the image to RGBA8."};
   }
+
+  auto metadata = image.metadata();
+  merge_metadata_entries(metadata.metadata_entries, load_embedded_metadata(path));
+  image = pixelscope::core::ImageData(
+      std::move(metadata),
+      image.pixels_rgba8(),
+      image.raw_samples(),
+      image.pixels_rgba16());
 
   return {.image = std::move(image)};
 }

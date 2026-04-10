@@ -100,6 +100,9 @@ get_filename_component(RAWLOADER_RUST_BIN_DIR "${RAWLOADER_RUSTC_EXECUTABLE}" DI
 set(RAWLOADER_BRIDGE_TARGET_DIR "${CMAKE_CURRENT_BINARY_DIR}/rawloader_bridge-target")
 set(RAWLOADER_BRIDGE_EXECUTABLE
     "${RAWLOADER_BRIDGE_TARGET_DIR}/release/rawloader_bridge${CMAKE_EXECUTABLE_SUFFIX}")
+set(METADATA_BRIDGE_TARGET_DIR "${CMAKE_CURRENT_BINARY_DIR}/metadata_bridge-target")
+set(METADATA_BRIDGE_EXECUTABLE
+    "${METADATA_BRIDGE_TARGET_DIR}/release/metadata_bridge${CMAKE_EXECUTABLE_SUFFIX}")
 
 add_custom_command(
   OUTPUT "${RAWLOADER_BRIDGE_EXECUTABLE}"
@@ -120,6 +123,25 @@ add_custom_command(
 
 add_custom_target(rawloader_bridge_build DEPENDS "${RAWLOADER_BRIDGE_EXECUTABLE}")
 
+add_custom_command(
+  OUTPUT "${METADATA_BRIDGE_EXECUTABLE}"
+  COMMAND
+    ${CMAKE_COMMAND} -E env
+    "PATH=${RAWLOADER_RUST_BIN_DIR}:$ENV{PATH}"
+    "RUSTC=${RAWLOADER_RUSTC_EXECUTABLE}"
+    "CARGO_TARGET_DIR=${METADATA_BRIDGE_TARGET_DIR}"
+    "${RAWLOADER_CARGO_EXECUTABLE}" build --manifest-path
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/metadata_bridge/Cargo.toml" --release
+  DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/metadata_bridge/Cargo.toml"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/metadata_bridge/src/main.rs"
+  WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+  COMMENT "Building metadata bridge"
+  VERBATIM
+)
+
+add_custom_target(metadata_bridge_build DEPENDS "${METADATA_BRIDGE_EXECUTABLE}")
+
 add_library(pixelscope_core STATIC
   src/core/histogram.cpp
   src/core/image.cpp
@@ -130,6 +152,7 @@ add_library(pixelscope_core STATIC
   src/io/dng_loader.cpp
   src/io/file_dialog.cpp
   src/io/image_loader.cpp
+  src/io/metadata_loader.cpp
   src/io/tiff_loader.cpp
   src/render/texture_cache.cpp
   src/ui/app.cpp
@@ -141,9 +164,10 @@ target_include_directories(pixelscope_core PUBLIC
 target_compile_definitions(
   pixelscope_core
   PRIVATE PIXELSCOPE_RAWLOADER_BRIDGE_PATH="${RAWLOADER_BRIDGE_EXECUTABLE}"
+          PIXELSCOPE_METADATA_BRIDGE_PATH="${METADATA_BRIDGE_EXECUTABLE}"
 )
 target_link_libraries(pixelscope_core PUBLIC SDL2::SDL2 imgui_lib tinyfiledialogs_lib TIFF::TIFF)
-add_dependencies(pixelscope_core rawloader_bridge_build)
+add_dependencies(pixelscope_core rawloader_bridge_build metadata_bridge_build)
 
 add_executable(pixelscope src/main.cpp)
 target_link_libraries(pixelscope PRIVATE pixelscope_core)

@@ -10,6 +10,8 @@
 #include <string>
 #include <vector>
 
+#include "io/metadata_loader.h"
+
 namespace pixelscope::io {
 
 namespace {
@@ -124,6 +126,7 @@ LoadImageResult decode_contiguous_tiff(
       .height = height,
       .original_channel_count = samples_per_pixel,
       .bits_per_channel = bits_per_channel,
+      .metadata_entries = load_embedded_metadata(path),
       .source_path = path,
   };
   return {.image = pixelscope::core::ImageData(std::move(metadata), std::move(pixels), {}, std::move(pixels16))};
@@ -210,6 +213,7 @@ LoadImageResult decode_separate_tiff(
       .height = height,
       .original_channel_count = samples_per_pixel,
       .bits_per_channel = bits_per_channel,
+      .metadata_entries = load_embedded_metadata(path),
       .source_path = path,
   };
   return {.image = pixelscope::core::ImageData(std::move(metadata), std::move(pixels), {}, std::move(pixels16))};

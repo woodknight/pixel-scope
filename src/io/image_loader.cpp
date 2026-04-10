@@ -10,6 +10,7 @@
 
 #include "io/binary_raw_loader.h"
 #include "io/dng_loader.h"
+#include "io/metadata_loader.h"
 #include "io/tiff_loader.h"
 
 namespace pixelscope::io {
@@ -88,6 +89,7 @@ LoadImageResult load_image_file(
       .height = height,
       .original_channel_count = channels_in_file,
       .bits_per_channel = 8,
+      .metadata_entries = load_embedded_metadata(path),
       .source_path = path,
   };
   return {.image = pixelscope::core::ImageData(std::move(metadata), std::move(pixels))};
