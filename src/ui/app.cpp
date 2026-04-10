@@ -150,10 +150,16 @@ void draw_metadata_row(const char* label, const std::string& value) {
     return;
   }
 
+  const float label_width = 132.0f * ImGui::GetIO().FontGlobalScale;
+  const float value_spacing = 18.0f * ImGui::GetIO().FontGlobalScale;
+  const float value_x = ImGui::GetCursorPosX() + label_width + value_spacing;
+
+  ImGui::AlignTextToFramePadding();
   ImGui::TextUnformatted(label);
-  ImGui::SameLine(140.0f * ImGui::GetIO().FontGlobalScale);
-  ImGui::PushTextWrapPos();
-  ImGui::TextUnformatted(value.c_str());
+  ImGui::SameLine(value_x);
+  ImGui::PushTextWrapPos(ImGui::GetCursorScreenPos().x +
+                         ImGui::GetContentRegionAvail().x);
+  ImGui::TextWrapped("%s", value.c_str());
   ImGui::PopTextWrapPos();
 }
 
