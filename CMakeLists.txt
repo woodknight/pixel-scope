@@ -175,6 +175,12 @@ target_link_libraries(pixelscope PRIVATE pixelscope_core)
 
 if(WIN32)
   target_link_libraries(pixelscope PRIVATE SDL2::SDL2main)
+  add_custom_command(TARGET pixelscope POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      $<TARGET_RUNTIME_DLLS:pixelscope>
+      $<TARGET_FILE_DIR:pixelscope>
+    COMMAND_EXPAND_LISTS
+  )
 endif()
 
 if(PIXELSCOPE_BUILD_TESTS)
@@ -184,6 +190,14 @@ if(PIXELSCOPE_BUILD_TESTS)
     PRIVATE PIXELSCOPE_TEST_IMAGES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/images"
   )
   target_link_libraries(pixelscope_tests PRIVATE pixelscope_core)
+  if(WIN32)
+    add_custom_command(TARGET pixelscope_tests POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        $<TARGET_RUNTIME_DLLS:pixelscope_tests>
+        $<TARGET_FILE_DIR:pixelscope_tests>
+      COMMAND_EXPAND_LISTS
+    )
+  endif()
   add_test(NAME pixelscope_tests COMMAND pixelscope_tests)
 endif()
 
