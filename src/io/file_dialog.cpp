@@ -35,7 +35,7 @@ ZenitySelection open_image_dialog_with_zenity() {
   constexpr const char* command =
       "zenity --file-selection "
       "--title='Open image' "
-      "--file-filter='Images | *.png *.PNG *.jpg *.JPG *.jpeg *.JPEG *.tif *.TIF *.tiff *.TIFF *.dng *.DNG' "
+      "--file-filter='Images | *.png *.PNG *.jpg *.JPG *.jpeg *.JPEG *.tif *.TIF *.tiff *.TIFF *.dng *.DNG *.raw *.RAW *.bin *.BIN *.bayer *.BAYER' "
       "2>/dev/null";
 
   std::unique_ptr<FILE, PipeCloser> pipe(popen(command, "r"));
@@ -75,13 +75,13 @@ std::optional<std::string> open_image_dialog() {
   }
 #endif
 
-  const char* filters[] = {"*.png", "*.jpg", "*.jpeg", "*.tif", "*.tiff", "*.dng"};
+  const char* filters[] = {"*.png", "*.jpg", "*.jpeg", "*.tif", "*.tiff", "*.dng", "*.raw", "*.bin", "*.bayer"};
   const char* selected = tinyfd_openFileDialog(
       "Open image",
       "",
-      6,
+      9,
       filters,
-      "PNG, JPEG, TIFF, and DNG",
+      "PNG, JPEG, TIFF, DNG, and binary Bayer raw",
       0);
   if (selected == nullptr) {
     return std::nullopt;

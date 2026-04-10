@@ -13,6 +13,7 @@
 #include "core/image_model.h"
 #include "core/image_statistics.h"
 #include "core/viewport.h"
+#include "io/binary_raw_loader.h"
 #include "render/texture_cache.h"
 
 namespace pixelscope::ui {
@@ -35,7 +36,25 @@ class App {
     bool active = false;
   };
 
+  struct PendingRawImport {
+    std::string path;
+    char width[32] = {};
+    char height[32] = {};
+    int bit_width_index = 1;
+    int cfa_index = 0;
+    int endianness_index = 0;
+    bool open_popup = false;
+  };
+
   bool load_image(const std::string& path);
+  bool load_image(
+      const std::string& path,
+      const std::optional<pixelscope::io::BinaryRawParameters>& binary_raw_parameters);
+  void queue_image_open(const std::string& path);
+  void queue_raw_import_dialog(const std::string& path);
+  void draw_raw_import_dialog();
+  [[nodiscard]] std::optional<pixelscope::io::BinaryRawParameters> parse_pending_raw_import(
+      std::string& error_message) const;
   void fit_image_to_canvas(float width, float height);
   [[nodiscard]] float compute_renderer_scale() const;
   [[nodiscard]] float compute_ui_scale() const;
@@ -52,7 +71,7 @@ class App {
   void draw_histogram_overlay(const pixelscope::core::Rect& canvas_rect);
   void draw_statistics_overlay(const pixelscope::core::Rect& canvas_rect);
   void draw_status_bar();
-  void refresh_dng_rendering();
+  void refresh_raw_bayer_rendering();
   void reset_hover();
   void maybe_enable_pixel_grid_for_zoom();
 
@@ -70,7 +89,7 @@ class App {
   bool show_statistics_ = false;
   bool show_pixel_grid_ = false;
   bool pixel_grid_manually_disabled_ = false;
-  bool show_dng_cfa_colors_ = false;
+  bool show_raw_cfa_colors_ = false;
   int open_dialog_delay_frames_ = 0;
   float renderer_scale_ = 1.0f;
   float ui_scale_ = 1.0f;
@@ -79,6 +98,7 @@ class App {
   std::string renderer_name_;
   std::string last_error_;
   HoverState hover_;
+  std::optional<PendingRawImport> pending_raw_import_;
 };
 
 }  // namespace pixelscope::ui

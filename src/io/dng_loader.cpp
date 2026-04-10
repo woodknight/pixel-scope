@@ -329,6 +329,21 @@ bool load_frame_with_rawloader(const std::string& input_path, DngFrame& frame, s
 
 }  // namespace
 
+pixelscope::core::ImageData make_raw_bayer_image(
+    pixelscope::core::ImageMetadata metadata,
+    std::vector<std::uint16_t> raw_samples,
+    bool use_cfa_colors) {
+  if (metadata.width <= 0 || metadata.height <= 0) {
+    return {};
+  }
+
+  metadata.original_channel_count = 1;
+  metadata.is_raw_bayer_plane = true;
+  std::vector<std::uint8_t> rgba_pixels(static_cast<std::size_t>(metadata.width * metadata.height * 4), 255);
+  pixelscope::core::ImageData image(std::move(metadata), std::move(rgba_pixels), std::move(raw_samples));
+  return render_raw_bayer_image(image, use_cfa_colors);
+}
+
 pixelscope::core::ImageData rgba8_image_from_dng_frame(
     const DngFrame& frame,
     const std::string& source_path) {
@@ -385,12 +400,25 @@ pixelscope::core::ImageData rgba8_image_from_dng_frame(
     }
   }
 
+  if (frame.samples_per_pixel == 1) {
+    pixelscope::core::ImageMetadata metadata{
+        .width = frame.width,
+        .height = frame.height,
+        .original_channel_count = 1,
+        .bits_per_channel = frame.original_bits_per_sample > 0 ? frame.original_bits_per_sample : frame.bits_per_sample,
+        .is_raw_bayer_plane = true,
+        .cfa_pattern = frame.cfa_pattern,
+        .source_path = source_path,
+    };
+    return make_raw_bayer_image(std::move(metadata), std::move(raw_samples), true);
+  }
+
   pixelscope::core::ImageMetadata metadata{
       .width = frame.width,
       .height = frame.height,
       .original_channel_count = frame.samples_per_pixel,
       .bits_per_channel = frame.original_bits_per_sample > 0 ? frame.original_bits_per_sample : frame.bits_per_sample,
-      .is_raw_bayer_plane = frame.samples_per_pixel == 1,
+      .is_raw_bayer_plane = false,
       .cfa_pattern = frame.cfa_pattern,
       .source_path = source_path,
   };

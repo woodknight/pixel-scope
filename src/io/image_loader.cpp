@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 
+#include "io/binary_raw_loader.h"
 #include "io/dng_loader.h"
 #include "io/tiff_loader.h"
 
@@ -26,7 +27,7 @@ bool is_supported_extension(const std::string& path) {
     return static_cast<char>(std::tolower(c));
   });
   return extension == ".png" || extension == ".jpg" || extension == ".jpeg" || extension == ".tif" ||
-         extension == ".tiff" || extension == ".dng";
+         extension == ".tiff" || extension == ".dng" || is_binary_raw_file_path(path);
 }
 
 std::string normalized_extension(const std::string& path) {
@@ -44,16 +45,26 @@ std::string normalized_extension(const std::string& path) {
 
 }  // namespace
 
-LoadImageResult load_image_file(const std::string& path) {
+LoadImageResult load_image_file(
+    const std::string& path,
+    std::optional<BinaryRawParameters> binary_raw_parameters) {
   const std::string extension = normalized_extension(path);
 
   if (!is_supported_extension(path)) {
-    return {.error_message = "Only PNG, JPEG, TIFF, and DNG are supported in this phase."};
+    return {.error_message = "Only PNG, JPEG, TIFF, DNG, and binary Bayer raw files are supported."};
   }
 
   if (extension == ".dng") {
     auto dng_result = load_dng_file(path);
     return {.image = std::move(dng_result.image), .error_message = std::move(dng_result.error_message)};
+  }
+
+  if (is_binary_raw_file_path(path)) {
+    if (!binary_raw_parameters.has_value()) {
+      return {.error_message = "Binary raw import needs width, height, CFA pattern, endianness, and bit width."};
+    }
+    auto raw_result = load_binary_raw_file(path, *binary_raw_parameters);
+    return {.image = std::move(raw_result.image), .error_message = std::move(raw_result.error_message)};
   }
 
   if (extension == ".tif" || extension == ".tiff") {

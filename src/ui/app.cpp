@@ -3,9 +3,11 @@
 #include <SDL.h>
 
 #include <algorithm>
-#include <cstdio>
 #include <cmath>
+#include <cstdio>
 #include <filesystem>
+#include <optional>
+#include <string>
 #include <utility>
 
 #include <backends/imgui_impl_sdl2.h>
@@ -31,6 +33,64 @@ constexpr float kHistogramOverlayMargin = 16.0f;
 constexpr float kHoverOverlayMargin = 16.0f;
 constexpr float kStatisticsOverlayWidth = 260.0f;
 constexpr int kMaxGridLinesPerAxis = 4096;
+constexpr const char* kRawImportPopupName = "Import Binary Bayer Raw";
+
+const std::array<const char*, 4>& cfa_pattern_labels() {
+  static const std::array<const char*, 4> labels = {"RGGB", "BGGR", "GRBG", "GBRG"};
+  return labels;
+}
+
+const std::array<const char*, 2>& raw_bit_width_labels() {
+  static const std::array<const char*, 2> labels = {"8-bit", "16-bit"};
+  return labels;
+}
+
+int cfa_pattern_to_index(const std::array<int, 4>& pattern) {
+  if (pattern == std::array<int, 4>{0, 1, 1, 2}) {
+    return 0;
+  }
+  if (pattern == std::array<int, 4>{2, 1, 1, 0}) {
+    return 1;
+  }
+  if (pattern == std::array<int, 4>{1, 0, 2, 1}) {
+    return 2;
+  }
+  if (pattern == std::array<int, 4>{1, 2, 0, 1}) {
+    return 3;
+  }
+  return 0;
+}
+
+std::array<int, 4> cfa_index_to_pattern(int index) {
+  switch (index) {
+    case 1:
+      return {2, 1, 1, 0};
+    case 2:
+      return {1, 0, 2, 1};
+    case 3:
+      return {1, 2, 0, 1};
+    default:
+      return {0, 1, 1, 2};
+  }
+}
+
+void write_int_guess(char* destination, std::size_t destination_size, int value) {
+  if (destination == nullptr || destination_size == 0) {
+    return;
+  }
+  destination[0] = '\0';
+  if (value > 0) {
+    std::snprintf(destination, destination_size, "%d", value);
+  }
+}
+
+int bit_width_to_index(int bits_per_sample) {
+  return bits_per_sample == 8 ? 0 : 1;
+}
+
+int bit_width_from_index(int index) {
+  return index == 0 ? 8 : 16;
+}
 
 pixelscope::core::Rect to_rect(const ImVec2& min, const ImVec2& size) {
   return {.x = min.x, .y = min.y, .w = size.x, .h = size.y};
@@ -183,7 +243,7 @@ bool App::initialize() {
   apply_ui_scale(compute_ui_scale());
 
   if (initial_path_) {
-    load_image(*initial_path_);
+    queue_image_open(*initial_path_);
   }
   return true;
 }
@@ -303,7 +363,7 @@ int App::run() {
       --open_dialog_delay_frames_;
       if (open_dialog_delay_frames_ == 0) {
         if (const auto path = pixelscope::io::open_image_dialog()) {
-          load_image(*path);
+          queue_image_open(*path);
         }
       }
     }
@@ -313,13 +373,19 @@ int App::run() {
 }
 
 bool App::load_image(const std::string& path) {
-  auto result = pixelscope::io::load_image_file(path);
+  return load_image(path, std::nullopt);
+}
+
+bool App::load_image(
+    const std::string& path,
+    const std::optional<pixelscope::io::BinaryRawParameters>& binary_raw_parameters) {
+  auto result = pixelscope::io::load_image_file(path, binary_raw_parameters);
   if (!result.ok()) {
     last_error_ = result.error_message;
     return false;
   }
 
-  if (result.image.metadata().is_raw_bayer_plane && !show_dng_cfa_colors_) {
+  if (result.image.metadata().is_raw_bayer_plane && !show_raw_cfa_colors_) {
     result.image = pixelscope::io::render_raw_bayer_image(result.image, false);
   }
 
@@ -336,7 +402,124 @@ bool App::load_image(const std::string& path) {
   return true;
 }
 
-void App::refresh_dng_rendering() {
+void App::queue_image_open(const std::string& path) {
+  if (pixelscope::io::is_binary_raw_file_path(path)) {
+    queue_raw_import_dialog(path);
+    return;
+  }
+
+  pending_raw_import_.reset();
+  load_image(path);
+}
+
+void App::queue_raw_import_dialog(const std::string& path) {
+  const auto guess = pixelscope::io::guess_binary_raw_parameters_from_filename(path);
+
+  PendingRawImport pending;
+  pending.path = path;
+  write_int_guess(pending.width, sizeof(pending.width), guess.parameters.width);
+  write_int_guess(pending.height, sizeof(pending.height), guess.parameters.height);
+  pending.bit_width_index = bit_width_to_index(guess.parameters.bits_per_sample);
+  pending.cfa_index = cfa_pattern_to_index(guess.parameters.cfa_pattern);
+  pending.endianness_index = guess.parameters.little_endian ? 0 : 1;
+  pending.open_popup = true;
+  pending_raw_import_ = std::move(pending);
+}
+
+std::optional<pixelscope::io::BinaryRawParameters> App::parse_pending_raw_import(std::string& error_message) const {
+  if (!pending_raw_import_.has_value()) {
+    error_message = "No binary raw import is pending.";
+    return std::nullopt;
+  }
+
+  const auto parse_positive_int = [&](const char* label, const char* value) -> std::optional<int> {
+    if (value == nullptr || value[0] == '\0') {
+      error_message = std::string(label) + " is required.";
+      return std::nullopt;
+    }
+
+    const std::string raw_value(value);
+    std::size_t parsed_length = 0;
+    int parsed = 0;
+    try {
+      parsed = std::stoi(raw_value, &parsed_length);
+    } catch (...) {
+      error_message = std::string(label) + " must be a positive integer.";
+      return std::nullopt;
+    }
+    if (parsed_length != raw_value.size() || parsed <= 0) {
+      error_message = std::string(label) + " must be a positive integer.";
+      return std::nullopt;
+    }
+    return parsed;
+  };
+
+  auto width = parse_positive_int("Width", pending_raw_import_->width);
+  if (!width.has_value()) {
+    return std::nullopt;
+  }
+  auto height = parse_positive_int("Height", pending_raw_import_->height);
+  if (!height.has_value()) {
+    return std::nullopt;
+  }
+  return pixelscope::io::BinaryRawParameters{
+      .width = *width,
+      .height = *height,
+      .bits_per_sample = bit_width_from_index(pending_raw_import_->bit_width_index),
+      .little_endian = pending_raw_import_->endianness_index == 0,
+      .cfa_pattern = cfa_index_to_pattern(pending_raw_import_->cfa_index),
+  };
+}
+
+void App::draw_raw_import_dialog() {
+  if (!pending_raw_import_.has_value()) {
+    return;
+  }
+
+  if (pending_raw_import_->open_popup) {
+    ImGui::OpenPopup(kRawImportPopupName);
+    pending_raw_import_->open_popup = false;
+  }
+
+  ImGui::SetNextWindowSize(ImVec2(460.0f * ui_scale_, 0.0f), ImGuiCond_Appearing);
+  if (!ImGui::BeginPopupModal(kRawImportPopupName, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    return;
+  }
+
+  ImGui::TextWrapped("Import settings for %s", pending_raw_import_->path.c_str());
+  ImGui::Separator();
+  ImGui::InputText("Width", pending_raw_import_->width, sizeof(pending_raw_import_->width));
+  ImGui::InputText("Height", pending_raw_import_->height, sizeof(pending_raw_import_->height));
+  ImGui::Combo(
+      "Bit Width",
+      &pending_raw_import_->bit_width_index,
+      raw_bit_width_labels().data(),
+      static_cast<int>(raw_bit_width_labels().size()));
+  ImGui::Combo("CFA Pattern", &pending_raw_import_->cfa_index, cfa_pattern_labels().data(), static_cast<int>(cfa_pattern_labels().size()));
+  const char* endianness_labels[] = {"Little-endian", "Big-endian"};
+  ImGui::Combo("Byte Order", &pending_raw_import_->endianness_index, endianness_labels, 2);
+
+  ImGui::Spacing();
+  if (ImGui::Button("Open", ImVec2(120.0f * ui_scale_, 0.0f))) {
+    std::string parse_error;
+    const auto parameters = parse_pending_raw_import(parse_error);
+    if (!parameters.has_value()) {
+      last_error_ = std::move(parse_error);
+    } else if (load_image(pending_raw_import_->path, parameters)) {
+      pending_raw_import_.reset();
+      ImGui::CloseCurrentPopup();
+    }
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Cancel", ImVec2(120.0f * ui_scale_, 0.0f))) {
+    pending_raw_import_.reset();
+    ImGui::CloseCurrentPopup();
+  }
+
+  ImGui::EndPopup();
+}
+
+void App::refresh_raw_bayer_rendering() {
   if (!image_model_.valid()) {
     return;
   }
@@ -347,7 +530,7 @@ void App::refresh_dng_rendering() {
   }
 
   image_model_ = pixelscope::core::build_image_model(
-      pixelscope::io::render_raw_bayer_image(source, show_dng_cfa_colors_));
+      pixelscope::io::render_raw_bayer_image(source, show_raw_cfa_colors_));
   histogram_ = {};
   histogram_ready_ = false;
   statistics_ = {};
@@ -493,7 +676,7 @@ void App::process_event(const SDL_Event& event, bool& running, bool& request_ope
 
   if (event.type == SDL_DROPFILE) {
     if (event.drop.file != nullptr) {
-      load_image(event.drop.file);
+      queue_image_open(event.drop.file);
       SDL_free(event.drop.file);
     }
     return;
@@ -526,6 +709,7 @@ void App::draw_ui(bool& request_open_dialog) {
   ImGui::Begin("CanvasHost", nullptr, canvas_flags);
   ImGui::PopStyleVar();
   draw_canvas();
+  draw_raw_import_dialog();
   ImGui::End();
 
   draw_hover_overlay(ImVec2(viewport_pos.x, viewport_pos.y + menu_height));
@@ -560,7 +744,7 @@ void App::draw_menu(bool& request_open_dialog) {
 
   if (ImGui::BeginMenu("View")) {
     const bool has_image = image_model_.valid();
-    const bool has_raw_bayer_dng = has_image && image_model_.source.metadata().is_raw_bayer_plane;
+    const bool has_raw_bayer_image = has_image && image_model_.source.metadata().is_raw_bayer_plane;
     if (ImGui::MenuItem("Fit to Window", nullptr, false, has_image)) {
       fit_image_to_canvas(
           ImGui::GetMainViewport()->Size.x,
@@ -593,8 +777,8 @@ void App::draw_menu(bool& request_open_dialog) {
         pixel_grid_manually_disabled_ = true;
       }
     }
-    if (ImGui::MenuItem("DNG CFA Colors", nullptr, &show_dng_cfa_colors_, has_raw_bayer_dng)) {
-      refresh_dng_rendering();
+    if (ImGui::MenuItem("RAW CFA Colors", nullptr, &show_raw_cfa_colors_, has_raw_bayer_image)) {
+      refresh_raw_bayer_rendering();
     }
     ImGui::EndMenu();
   }
@@ -614,7 +798,7 @@ void App::draw_canvas() {
   draw_list->AddRectFilled(canvas_pos, ImVec2(canvas_pos.x + canvas_size.x, canvas_pos.y + canvas_size.y), IM_COL32(24, 26, 32, 255));
 
   if (!image_model_.valid()) {
-    const char* prompt = "Open a PNG, JPEG, or DNG to inspect pixels.";
+    const char* prompt = "Open a PNG, JPEG, TIFF, DNG, or binary Bayer raw to inspect pixels.";
     const ImVec2 text_size = ImGui::CalcTextSize(prompt);
     draw_list->AddText(
         ImVec2(canvas_pos.x + (canvas_size.x - text_size.x) * 0.5f, canvas_pos.y + (canvas_size.y - text_size.y) * 0.5f),

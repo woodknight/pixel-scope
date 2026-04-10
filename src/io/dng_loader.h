@@ -28,6 +28,10 @@ struct DngFrame {
   std::vector<std::uint8_t> decoded_bytes;
 };
 
+[[nodiscard]] pixelscope::core::ImageData make_raw_bayer_image(
+    pixelscope::core::ImageMetadata metadata,
+    std::vector<std::uint16_t> raw_samples,
+    bool use_cfa_colors);
 [[nodiscard]] pixelscope::core::ImageData rgba8_image_from_dng_frame(
     const DngFrame& frame,
     const std::string& source_path);
