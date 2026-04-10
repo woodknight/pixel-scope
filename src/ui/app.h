@@ -54,6 +54,7 @@ class App {
   void draw_status_bar();
   void refresh_dng_rendering();
   void reset_hover();
+  void maybe_enable_pixel_grid_for_zoom();
 
   std::optional<std::string> initial_path_;
   SDL_Window* window_ = nullptr;
@@ -68,6 +69,7 @@ class App {
   bool show_histogram_ = false;
   bool show_statistics_ = false;
   bool show_pixel_grid_ = false;
+  bool pixel_grid_manually_disabled_ = false;
   bool show_dng_cfa_colors_ = false;
   int open_dialog_delay_frames_ = 0;
   float renderer_scale_ = 1.0f;

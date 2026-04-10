@@ -356,6 +356,16 @@ void App::refresh_dng_rendering() {
   reset_hover();
 }
 
+void App::maybe_enable_pixel_grid_for_zoom() {
+  if (!image_model_.valid() || show_pixel_grid_ || pixel_grid_manually_disabled_) {
+    return;
+  }
+
+  if (view_.zoom >= kGridMinZoom) {
+    show_pixel_grid_ = true;
+  }
+}
+
 void App::fit_image_to_canvas(float width, float height) {
   if (!image_model_.valid()) {
     return;
@@ -368,6 +378,7 @@ void App::fit_image_to_canvas(float width, float height) {
       height);
   view_.pan = {};
   view_initialized_ = true;
+  maybe_enable_pixel_grid_for_zoom();
 }
 
 float App::compute_renderer_scale() const {
@@ -559,6 +570,7 @@ void App::draw_menu(bool& request_open_dialog) {
       view_.zoom = 1.0f;
       view_.pan = {};
       view_initialized_ = true;
+      maybe_enable_pixel_grid_for_zoom();
     }
     ImGui::Separator();
     const bool histogram_enabled_before = show_histogram_;
@@ -573,7 +585,14 @@ void App::draw_menu(bool& request_open_dialog) {
       statistics_ = pixelscope::core::compute_image_statistics(image_model_.source);
       statistics_ready_ = true;
     }
-    ImGui::MenuItem("Pixel Grid", nullptr, &show_pixel_grid_, has_image);
+    const bool pixel_grid_enabled_before = show_pixel_grid_;
+    if (ImGui::MenuItem("Pixel Grid", nullptr, &show_pixel_grid_, has_image)) {
+      if (show_pixel_grid_) {
+        pixel_grid_manually_disabled_ = false;
+      } else if (pixel_grid_enabled_before || view_.zoom >= kGridMinZoom) {
+        pixel_grid_manually_disabled_ = true;
+      }
+    }
     if (ImGui::MenuItem("DNG CFA Colors", nullptr, &show_dng_cfa_colors_, has_raw_bayer_dng)) {
       refresh_dng_rendering();
     }
@@ -654,6 +673,7 @@ void App::draw_canvas() {
           source_image.metadata().height,
           canvas_rect);
       view_initialized_ = true;
+      maybe_enable_pixel_grid_for_zoom();
     }
 
     const auto image_point = pixelscope::core::screen_to_image(
