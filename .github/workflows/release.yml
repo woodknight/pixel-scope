@@ -16,19 +16,10 @@ jobs:
         include:
           - name: Linux
             os: ubuntu-latest
-            cpack_generator: TGZ
-            artifact_suffix: linux-x86_64
-            package_extension: tar.gz
           - name: macOS
             os: macos-latest
-            cpack_generator: ZIP
-            artifact_suffix: macos-x86_64
-            package_extension: zip
           - name: Windows
             os: windows-latest
-            cpack_generator: ZIP
-            artifact_suffix: windows-x86_64
-            package_extension: zip
 
     steps:
       - name: Check out source
@@ -47,6 +38,34 @@ jobs:
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+
+      - name: Resolve artifact suffix
+        id: artifact
+        shell: bash
+        run: |
+          arch="$(uname -m)"
+          case "${arch}" in
+            x86_64|amd64)
+              arch="x86_64"
+              ;;
+            aarch64|arm64)
+              arch="arm64"
+              ;;
+          esac
+
+          case "${RUNNER_OS}" in
+            Linux)
+              platform="linux"
+              ;;
+            macOS)
+              platform="macos"
+              ;;
+            Windows)
+              platform="windows"
+              ;;
+          esac
+
+          echo "value=${platform}-${arch}" >> "$GITHUB_OUTPUT"
 
       - name: Install Linux system dependencies
         if: runner.os == 'Linux'
@@ -75,7 +94,8 @@ jobs:
             libgbm-dev \
             libwayland-dev \
             libxkbcommon-dev \
-            libdecor-0-dev
+            libdecor-0-dev \
+            zsync
 
       - name: Install macOS system dependencies
         if: runner.os == 'macOS'
@@ -111,28 +131,69 @@ jobs:
         shell: bash
         run: cmake --install build --config Release --prefix install
 
-      - name: Package
-        working-directory: build
+      - name: Package archive
         shell: bash
-        run: cpack -G "${{ matrix.cpack_generator }}" -C Release
+        run: |
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            cpack --config build/CPackConfig.cmake -G TGZ -C Release
+          elif [ "$RUNNER_OS" = "macOS" ]; then
+            cpack --config build/CPackConfig.cmake -G ZIP -C Release
+          else
+            cpack --config build/CPackConfig.cmake -G ZIP -C Release
+            cpack --config build/CPackConfig.cmake -G NSIS -C Release
+          fi
 
-      - name: Normalize package filename
+      - name: Build AppImage
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          mkdir -p dist AppDir/usr
+          cmake --install build --prefix AppDir/usr
+          install -Dm755 packaging/linux/AppRun AppDir/AppRun
+          install -Dm644 packaging/linux/pixelscope.desktop AppDir/usr/share/applications/pixelscope.desktop
+          install -Dm644 assets/icon/icon_256x256.png AppDir/usr/share/icons/hicolor/256x256/apps/pixelscope.png
+          install -Dm644 assets/icon/icon_256x256.png AppDir/pixelscope.png
+          curl -L https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage -o linuxdeploy.AppImage
+          chmod +x linuxdeploy.AppImage
+          VERSION="${{ steps.version.outputs.value }}" \
+            OUTPUT="dist/pixelscope-${{ steps.version.outputs.value }}-${{ steps.artifact.outputs.value }}.AppImage" \
+            ./linuxdeploy.AppImage --appimage-extract-and-run \
+              --appdir AppDir \
+              --desktop-file packaging/linux/pixelscope.desktop \
+              --icon-file assets/icon/icon_256x256.png \
+              --executable AppDir/usr/bin/pixelscope \
+              --output appimage
+
+      - name: Normalize packaged filenames
         shell: bash
         run: |
           mkdir -p dist
-          package_path="$(find build -maxdepth 1 -type f \( -name '*.zip' -o -name '*.tar.gz' \) | head -n 1)"
-          if [[ -z "${package_path}" ]]; then
-            echo "No package produced by CPack" >&2
-            exit 1
-          fi
-          cp "${package_path}" \
-            "dist/pixelscope-${{ steps.version.outputs.value }}-${{ matrix.artifact_suffix }}.${{ matrix.package_extension }}"
+          while IFS= read -r -d '' package_path; do
+            base="$(basename "${package_path}")"
+            case "${base}" in
+              *.tar.gz)
+                cp "${package_path}" "dist/pixelscope-${{ steps.version.outputs.value }}-${{ steps.artifact.outputs.value }}.tar.gz"
+                ;;
+              *.zip)
+                cp "${package_path}" "dist/pixelscope-${{ steps.version.outputs.value }}-${{ steps.artifact.outputs.value }}.zip"
+                ;;
+              *.exe)
+                cp "${package_path}" "dist/pixelscope-${{ steps.version.outputs.value }}-${{ steps.artifact.outputs.value }}-setup.exe"
+                ;;
+            esac
+          done < <(find build -maxdepth 1 -type f \( -name '*.zip' -o -name '*.tar.gz' -o -name '*.exe' \) -print0)
+
+      - name: Generate checksums
+        shell: bash
+        run: |
+          cd dist
+          sha256sum * > "SHA256SUMS-${{ steps.artifact.outputs.value }}.txt"
 
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: pixelscope-${{ steps.version.outputs.value }}-${{ matrix.artifact_suffix }}
-          path: dist/pixelscope-${{ steps.version.outputs.value }}-${{ matrix.artifact_suffix }}.${{ matrix.package_extension }}
+          name: pixelscope-${{ steps.version.outputs.value }}-${{ steps.artifact.outputs.value }}
+          path: dist/*
           if-no-files-found: error
           retention-days: 14
 

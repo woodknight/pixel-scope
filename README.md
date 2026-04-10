@@ -255,11 +255,22 @@ The repository includes a GitHub Actions release workflow at `.github/workflows/
 
 - `workflow_dispatch` builds Linux, macOS, and Windows artifacts and uploads them as workflow artifacts.
 - Tagging `v0.1.0` style releases builds the same matrix and only publishes release assets if every job passes.
-- Linux packages are emitted as `.tar.gz`.
-- macOS and Windows packages are emitted as `.zip`.
+- Linux packages are emitted as `.tar.gz` and `.AppImage`.
+- macOS packages are emitted as `.zip`.
+- Windows packages are emitted as `.zip` and NSIS installer `.exe`.
 - Uploaded artifact names are normalized to `pixelscope-<version>-<platform>.<ext>`.
+- Each artifact set also includes a platform-specific checksum file such as `SHA256SUMS-linux-x86_64.txt`.
 
 The workflow currently scaffolds portable release archives. Code signing, notarization, DMG creation, MSI/EXE installers, Homebrew, `winget`, and AppImage/Flatpak publishing are good next steps once the archive-based release flow is stable.
+
+## Package Managers
+
+This repository includes downstream publishing metadata:
+
+- Homebrew formula scaffold: `packaging/homebrew/Formula/pixelscope.rb`
+- winget manifests: `packaging/winget/manifests/Woodknight/PixelScope/0.1.0/`
+
+These files are intended as release-aligned publishing artifacts you can submit to your Homebrew tap and the `microsoft/winget-pkgs` repository.
 
 After launch you can also open files from:
 

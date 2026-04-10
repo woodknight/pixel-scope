@@ -1,0 +1,28 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.12.0.schema.json
+
+PackageIdentifier: Woodknight.PixelScope
+PackageVersion: 0.1.0
+PackageLocale: en-US
+Publisher: LJ
+PublisherUrl: https://github.com/woodknight/pixel-scope
+PublisherSupportUrl: https://github.com/woodknight/pixel-scope/issues
+PackageName: PixelScope
+PackageUrl: https://github.com/woodknight/pixel-scope
+License: MIT
+LicenseUrl: https://github.com/woodknight/pixel-scope/blob/v0.1.0/LICENSE
+ShortDescription: Cross-platform pixel inspection desktop viewer
+Description: |-
+  PixelScope is a lightweight desktop image inspection tool for exact pixel work.
+  It supports deep zoom, crisp nearest-neighbor rendering, exact pixel readout,
+  DNG/TIFF inspection, and metadata overlays for debugging image content.
+Moniker: pixelscope
+Tags:
+- image
+- imaging
+- inspection
+- pixel
+- raw
+- viewer
+ReleaseDate: 2026-04-10
+ManifestType: defaultLocale
+ManifestVersion: 1.12.0

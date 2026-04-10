@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=PixelScope
+Comment=Cross-platform pixel inspection desktop viewer
+Exec=pixelscope %U
+Icon=pixelscope
+Categories=Graphics;Viewer;
+Terminal=false
+StartupNotify=true
+MimeType=image/png;image/jpeg;image/tiff;image/x-adobe-dng;
