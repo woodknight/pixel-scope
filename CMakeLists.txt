@@ -124,6 +124,7 @@ add_library(pixelscope_core STATIC
   src/core/histogram.cpp
   src/core/image.cpp
   src/core/image_model.cpp
+  src/core/image_statistics.cpp
   src/core/viewport.cpp
   src/io/dng_loader.cpp
   src/io/file_dialog.cpp

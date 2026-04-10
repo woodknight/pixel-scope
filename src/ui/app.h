@@ -11,6 +11,7 @@
 
 #include "core/histogram.h"
 #include "core/image_model.h"
+#include "core/image_statistics.h"
 #include "core/viewport.h"
 #include "render/texture_cache.h"
 
@@ -49,6 +50,7 @@ class App {
   void draw_canvas();
   void draw_hover_overlay(const ImVec2& canvas_pos);
   void draw_histogram_overlay(const pixelscope::core::Rect& canvas_rect);
+  void draw_statistics_overlay(const pixelscope::core::Rect& canvas_rect);
   void draw_status_bar();
   void refresh_dng_rendering();
   void reset_hover();
@@ -58,10 +60,13 @@ class App {
   SDL_Renderer* renderer_ = nullptr;
   pixelscope::core::ImageModel image_model_;
   pixelscope::core::ImageHistogram histogram_;
+  pixelscope::core::ImageStatistics statistics_;
   pixelscope::core::ViewState view_;
   bool view_initialized_ = false;
   bool histogram_ready_ = false;
+  bool statistics_ready_ = false;
   bool show_histogram_ = false;
+  bool show_statistics_ = false;
   bool show_pixel_grid_ = false;
   bool show_dng_cfa_colors_ = false;
   int open_dialog_delay_frames_ = 0;

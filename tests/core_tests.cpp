@@ -2,12 +2,14 @@
 #include <cstddef>
 #include <cstdint>
 #include <algorithm>
+#include <cmath>
 #include <string>
 #include <vector>
 
 #include "core/histogram.h"
 #include "core/image.h"
 #include "core/image_model.h"
+#include "core/image_statistics.h"
 #include "core/viewport.h"
 #include "io/dng_loader.h"
 #include "io/image_loader.h"
@@ -175,6 +177,103 @@ int main() {
     assert(histogram.green.max_count == expected.green.max_count);
     assert(histogram.blue.max_count == expected.blue.max_count);
     assert(histogram.luminance.max_count == expected.luminance.max_count);
+  }
+
+  {
+    pixelscope::core::ImageMetadata metadata{
+        .width = 5,
+        .height = 1,
+        .original_channel_count = 4,
+        .bits_per_channel = 8,
+        .source_path = "statistics-rgb.png",
+    };
+    pixelscope::core::ImageData image(metadata, std::vector<std::uint8_t>{
+                                                    0, 0, 0, 255,
+                                                    64, 64, 64, 255,
+                                                    128, 128, 128, 255,
+                                                    192, 192, 192, 255,
+                                                    255, 255, 255, 255,
+                                                });
+    const auto statistics = pixelscope::core::compute_image_statistics(image);
+    assert(!statistics.empty());
+    assert(statistics.sample_count == 5);
+    assert(!statistics.uses_raw_samples);
+    assert(!statistics.uses_high_precision_luminance);
+    assert(statistics.min_value == 0);
+    assert(statistics.percentile_10 == 0);
+    assert(statistics.median == 128);
+    assert(statistics.percentile_90 == 192);
+    assert(statistics.max_value == 255);
+    assert(std::fabs(statistics.mean - 127.8) < 1e-9);
+  }
+
+  {
+    pixelscope::core::ImageMetadata metadata{
+        .width = 5,
+        .height = 1,
+        .original_channel_count = 4,
+        .bits_per_channel = 10,
+        .is_raw_bayer_plane = true,
+        .source_path = "statistics-raw.dng",
+    };
+    pixelscope::core::ImageData image(
+        metadata,
+        std::vector<std::uint8_t>{
+            0, 0, 0, 255,
+            0, 0, 0, 255,
+            0, 0, 0, 255,
+            0, 0, 0, 255,
+            0, 0, 0, 255,
+        },
+        std::vector<std::uint16_t>{64, 128, 512, 900, 1023});
+    const auto statistics = pixelscope::core::compute_image_statistics(image);
+    assert(!statistics.empty());
+    assert(statistics.sample_count == 5);
+    assert(statistics.uses_raw_samples);
+    assert(!statistics.uses_high_precision_luminance);
+    assert(statistics.min_value == 64);
+    assert(statistics.percentile_10 == 64);
+    assert(statistics.median == 512);
+    assert(statistics.percentile_90 == 900);
+    assert(statistics.max_value == 1023);
+    assert(std::fabs(statistics.mean - 525.4) < 1e-9);
+  }
+
+  {
+    pixelscope::core::ImageMetadata metadata{
+        .width = 5,
+        .height = 1,
+        .original_channel_count = 4,
+        .bits_per_channel = 16,
+        .source_path = "statistics-rgb16.tif",
+    };
+    pixelscope::core::ImageData image(
+        metadata,
+        std::vector<std::uint8_t>{
+            0, 0, 0, 255,
+            0, 0, 0, 255,
+            0, 0, 0, 255,
+            0, 0, 0, 255,
+            0, 0, 0, 255,
+        },
+        {},
+        std::vector<std::uint16_t>{
+            0, 0, 0, 65535,
+            16384, 16384, 16384, 65535,
+            32768, 32768, 32768, 65535,
+            49152, 49152, 49152, 65535,
+            65535, 65535, 65535, 65535,
+        });
+    const auto statistics = pixelscope::core::compute_image_statistics(image);
+    assert(!statistics.empty());
+    assert(!statistics.uses_raw_samples);
+    assert(statistics.uses_high_precision_luminance);
+    assert(statistics.min_value == 0);
+    assert(statistics.percentile_10 == 0);
+    assert(statistics.median == 32768);
+    assert(statistics.percentile_90 == 49152);
+    assert(statistics.max_value == 65535);
+    assert(std::fabs(statistics.mean - 32767.8) < 1e-9);
   }
 
   {

@@ -3,6 +3,7 @@
 #include <SDL.h>
 
 #include <algorithm>
+#include <cstdio>
 #include <cmath>
 #include <filesystem>
 #include <utility>
@@ -28,6 +29,7 @@ constexpr float kHistogramOverlayWidth = 240.0f;
 constexpr float kHistogramOverlayHeight = 128.0f;
 constexpr float kHistogramOverlayMargin = 16.0f;
 constexpr float kHoverOverlayMargin = 16.0f;
+constexpr float kStatisticsOverlayWidth = 260.0f;
 constexpr int kMaxGridLinesPerAxis = 4096;
 
 pixelscope::core::Rect to_rect(const ImVec2& min, const ImVec2& size) {
@@ -62,6 +64,22 @@ const char* cfa_label(const pixelscope::core::ImageMetadata& metadata, int x, in
     return "B";
   }
   return "?";
+}
+
+const char* statistics_value_label(const pixelscope::core::ImageStatistics& statistics) {
+  if (statistics.uses_raw_samples) {
+    return "Raw";
+  }
+  if (statistics.uses_high_precision_luminance) {
+    return "Luma16";
+  }
+  return "Luma";
+}
+
+void draw_statistics_row(const char* label, const char* value) {
+  ImGui::TextUnformatted(label);
+  ImGui::SameLine(120.0f * ImGui::GetIO().FontGlobalScale);
+  ImGui::TextUnformatted(value);
 }
 
 void draw_pixel_grid_overlay(
@@ -308,6 +326,8 @@ bool App::load_image(const std::string& path) {
   image_model_ = pixelscope::core::build_image_model(std::move(result.image));
   histogram_ = {};
   histogram_ready_ = false;
+  statistics_ = {};
+  statistics_ready_ = false;
   texture_cache_.clear();
   last_error_.clear();
   reset_hover();
@@ -330,6 +350,8 @@ void App::refresh_dng_rendering() {
       pixelscope::io::render_raw_bayer_image(source, show_dng_cfa_colors_));
   histogram_ = {};
   histogram_ready_ = false;
+  statistics_ = {};
+  statistics_ready_ = false;
   texture_cache_.clear();
   reset_hover();
 }
@@ -540,10 +562,16 @@ void App::draw_menu(bool& request_open_dialog) {
     }
     ImGui::Separator();
     const bool histogram_enabled_before = show_histogram_;
+    const bool statistics_enabled_before = show_statistics_;
     ImGui::MenuItem("Histogram Overlay", nullptr, &show_histogram_, has_image);
     if (show_histogram_ && !histogram_enabled_before && image_model_.valid() && !histogram_ready_) {
       histogram_ = pixelscope::core::compute_histogram(image_model_.source);
       histogram_ready_ = true;
+    }
+    ImGui::MenuItem("Image Statistics", nullptr, &show_statistics_, has_image);
+    if (show_statistics_ && !statistics_enabled_before && image_model_.valid() && !statistics_ready_) {
+      statistics_ = pixelscope::core::compute_image_statistics(image_model_.source);
+      statistics_ready_ = true;
     }
     ImGui::MenuItem("Pixel Grid", nullptr, &show_pixel_grid_, has_image);
     if (ImGui::MenuItem("DNG CFA Colors", nullptr, &show_dng_cfa_colors_, has_raw_bayer_dng)) {
@@ -657,6 +685,7 @@ void App::draw_canvas() {
   }
 
   draw_histogram_overlay(canvas_rect);
+  draw_statistics_overlay(canvas_rect);
 
   ImGui::EndChild();
 }
@@ -762,6 +791,50 @@ void App::draw_histogram_overlay(const pixelscope::core::Rect& canvas_rect) {
   draw_channel(histogram_.red, IM_COL32(255, 96, 96, 210));
   draw_channel(histogram_.green, IM_COL32(96, 220, 120, 210));
   draw_channel(histogram_.blue, IM_COL32(96, 156, 255, 210));
+}
+
+void App::draw_statistics_overlay(const pixelscope::core::Rect& canvas_rect) {
+  if (!show_statistics_) {
+    return;
+  }
+
+  if (!statistics_ready_ && image_model_.valid()) {
+    statistics_ = pixelscope::core::compute_image_statistics(image_model_.source);
+    statistics_ready_ = true;
+  }
+
+  if (statistics_.empty()) {
+    return;
+  }
+
+  const float margin = kHistogramOverlayMargin * ui_scale_;
+  const float width = kStatisticsOverlayWidth * ui_scale_;
+  const ImVec2 overlay_pos(canvas_rect.x + canvas_rect.w - width - margin, canvas_rect.y + margin);
+
+  ImGui::SetNextWindowPos(overlay_pos, ImGuiCond_Always);
+  ImGui::SetNextWindowSize(ImVec2(width, 0.0f), ImGuiCond_Always);
+  ImGui::SetNextWindowBgAlpha(0.86f);
+
+  ImGuiWindowFlags overlay_flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
+                                   ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing |
+                                   ImGuiWindowFlags_NoNav;
+  ImGui::Begin("StatisticsOverlay", nullptr, overlay_flags);
+
+  char mean_value[32] = {};
+  std::snprintf(mean_value, sizeof(mean_value), "%.2f", statistics_.mean);
+
+  ImGui::TextUnformatted("Statistics");
+  ImGui::Separator();
+  draw_statistics_row("Mode", statistics_value_label(statistics_));
+  ImGui::Text("Samples: %zu", statistics_.sample_count);
+  ImGui::Text("Min: %u", statistics_.min_value);
+  ImGui::Text("P10: %u", statistics_.percentile_10);
+  ImGui::Text("Median: %u", statistics_.median);
+  ImGui::Text("Mean: %s", mean_value);
+  ImGui::Text("P90: %u", statistics_.percentile_90);
+  ImGui::Text("Max: %u", statistics_.max_value);
+
+  ImGui::End();
 }
 
 void App::draw_status_bar() {
