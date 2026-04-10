@@ -4,6 +4,7 @@ project(PixelScope VERSION 0.1.0 LANGUAGES CXX C)
 
 include(FetchContent)
 include(CTest)
+include(GNUInstallDirs)
 
 find_package(TIFF REQUIRED)
 
@@ -153,6 +154,7 @@ add_library(pixelscope_core STATIC
   src/io/file_dialog.cpp
   src/io/image_loader.cpp
   src/io/metadata_loader.cpp
+  src/platform/runtime_paths.cpp
   src/io/tiff_loader.cpp
   src/render/texture_cache.cpp
   src/ui/app.cpp
@@ -164,7 +166,9 @@ target_include_directories(pixelscope_core PUBLIC
 target_compile_definitions(
   pixelscope_core
   PRIVATE PIXELSCOPE_RAWLOADER_BRIDGE_PATH="${RAWLOADER_BRIDGE_EXECUTABLE}"
+          PIXELSCOPE_RAWLOADER_BRIDGE_FILENAME="rawloader_bridge${CMAKE_EXECUTABLE_SUFFIX}"
           PIXELSCOPE_METADATA_BRIDGE_PATH="${METADATA_BRIDGE_EXECUTABLE}"
+          PIXELSCOPE_METADATA_BRIDGE_FILENAME="metadata_bridge${CMAKE_EXECUTABLE_SUFFIX}"
 )
 target_link_libraries(pixelscope_core PUBLIC SDL2::SDL2 imgui_lib tinyfiledialogs_lib TIFF::TIFF)
 add_dependencies(pixelscope_core rawloader_bridge_build metadata_bridge_build)
@@ -181,3 +185,53 @@ if(PIXELSCOPE_BUILD_TESTS)
   target_link_libraries(pixelscope_tests PRIVATE pixelscope_core)
   add_test(NAME pixelscope_tests COMMAND pixelscope_tests)
 endif()
+
+install(TARGETS pixelscope
+  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+  BUNDLE DESTINATION .
+)
+
+install(PROGRAMS
+  "${RAWLOADER_BRIDGE_EXECUTABLE}"
+  "${METADATA_BRIDGE_EXECUTABLE}"
+  DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
+
+if(WIN32)
+  install(FILES $<TARGET_RUNTIME_DLLS:pixelscope>
+    DESTINATION ${CMAKE_INSTALL_BINDIR}
+    COMPONENT Runtime
+  )
+endif()
+
+install(FILES
+  LICENSE
+  DESTINATION ${CMAKE_INSTALL_DATADIR}/pixelscope
+)
+
+install(FILES
+  assets/icon/icon_128x128.png
+  assets/icon/icon_256x256.png
+  assets/icon/pixel-scope.ico
+  assets/icon/pixelscope.icns
+  DESTINATION ${CMAKE_INSTALL_DATADIR}/pixelscope/icons
+)
+
+set(CPACK_PACKAGE_NAME "PixelScope")
+set(CPACK_PACKAGE_VENDOR "PixelScope")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Cross-platform pixel inspection desktop viewer")
+set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
+set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}-${PROJECT_VERSION}-${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}")
+set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
+set(CPACK_PACKAGE_INSTALL_DIRECTORY "PixelScope")
+set(CPACK_STRIP_FILES ON)
+
+if(APPLE)
+  set(CPACK_GENERATOR "ZIP")
+elseif(WIN32)
+  set(CPACK_GENERATOR "ZIP")
+else()
+  set(CPACK_GENERATOR "TGZ")
+endif()
+
+include(CPack)

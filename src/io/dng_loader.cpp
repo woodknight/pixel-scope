@@ -1,5 +1,6 @@
 #include "io/dng_loader.h"
 #include "io/metadata_loader.h"
+#include "platform/runtime_paths.h"
 
 #include <algorithm>
 #include <array>
@@ -21,6 +22,10 @@
 
 #ifndef PIXELSCOPE_RAWLOADER_BRIDGE_PATH
 #define PIXELSCOPE_RAWLOADER_BRIDGE_PATH "rawloader_bridge"
+#endif
+
+#ifndef PIXELSCOPE_RAWLOADER_BRIDGE_FILENAME
+#define PIXELSCOPE_RAWLOADER_BRIDGE_FILENAME "rawloader_bridge"
 #endif
 
 namespace pixelscope::io {
@@ -369,7 +374,10 @@ bool run_rawloader_bridge(
     const std::filesystem::path& output_path,
     const std::filesystem::path& error_path,
     std::string& error_message) {
-  const std::string command = shell_quote(PIXELSCOPE_RAWLOADER_BRIDGE_PATH) + " " +
+  const auto bridge_path = pixelscope::platform::resolve_companion_binary(
+      PIXELSCOPE_RAWLOADER_BRIDGE_FILENAME,
+      PIXELSCOPE_RAWLOADER_BRIDGE_PATH);
+  const std::string command = shell_quote(bridge_path.string()) + " " +
                               shell_quote(input_path) + " " +
                               shell_quote(output_path.string()) + " 2> " +
                               shell_quote(error_path.string());
@@ -501,8 +509,11 @@ bool load_frame_with_rawloader(const std::string& input_path, DngFrame& frame, s
   const auto stderr_path = temp_output_path(".log");
   ScopedFileCleanup payload_cleanup{payload_path};
   ScopedFileCleanup stderr_cleanup{stderr_path};
+  const auto bridge_path = pixelscope::platform::resolve_companion_binary(
+      PIXELSCOPE_RAWLOADER_BRIDGE_FILENAME,
+      PIXELSCOPE_RAWLOADER_BRIDGE_PATH);
 
-  if (!std::filesystem::exists(PIXELSCOPE_RAWLOADER_BRIDGE_PATH)) {
+  if (!std::filesystem::exists(bridge_path)) {
     error_message = "rawloader bridge binary is missing from the build output.";
     return false;
   }

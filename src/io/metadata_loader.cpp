@@ -1,4 +1,5 @@
 #include "io/metadata_loader.h"
+#include "platform/runtime_paths.h"
 
 #include <array>
 #include <chrono>
@@ -14,6 +15,10 @@
 
 #ifndef PIXELSCOPE_METADATA_BRIDGE_PATH
 #define PIXELSCOPE_METADATA_BRIDGE_PATH "metadata_bridge"
+#endif
+
+#ifndef PIXELSCOPE_METADATA_BRIDGE_FILENAME
+#define PIXELSCOPE_METADATA_BRIDGE_FILENAME "metadata_bridge"
 #endif
 
 namespace pixelscope::io {
@@ -110,7 +115,10 @@ struct ScopedFileCleanup {
 };
 
 bool run_metadata_bridge(const std::string& input_path, const std::filesystem::path& output_path) {
-  const std::string command = shell_quote(PIXELSCOPE_METADATA_BRIDGE_PATH) + " " +
+  const auto bridge_path = pixelscope::platform::resolve_companion_binary(
+      PIXELSCOPE_METADATA_BRIDGE_FILENAME,
+      PIXELSCOPE_METADATA_BRIDGE_PATH);
+  const std::string command = shell_quote(bridge_path.string()) + " " +
                               shell_quote(input_path) + " " +
                               shell_quote(output_path.string());
   return std::system(command.c_str()) == 0;
@@ -156,7 +164,10 @@ std::vector<pixelscope::core::MetadataEntry> parse_metadata_payload(const std::f
 }  // namespace
 
 std::vector<pixelscope::core::MetadataEntry> load_embedded_metadata(const std::string& path) {
-  if (!std::filesystem::exists(PIXELSCOPE_METADATA_BRIDGE_PATH)) {
+  const auto bridge_path = pixelscope::platform::resolve_companion_binary(
+      PIXELSCOPE_METADATA_BRIDGE_FILENAME,
+      PIXELSCOPE_METADATA_BRIDGE_PATH);
+  if (!std::filesystem::exists(bridge_path)) {
     return {};
   }
 

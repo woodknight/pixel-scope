@@ -109,6 +109,7 @@ class App {
   pixelscope::render::TextureCache texture_cache_;
   std::string renderer_name_;
   std::string last_error_;
+  std::string imgui_ini_path_;
   HoverState hover_;
   std::optional<PendingRawImport> pending_raw_import_;
 };

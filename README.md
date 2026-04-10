@@ -206,6 +206,8 @@ The main executable is produced at:
 ./build/pixelscope
 ```
 
+The Rust helper executables are also built during this step and are discovered automatically when running from the build tree or from an installed package.
+
 ## Run
 
 Start the viewer with no file:
@@ -219,6 +221,43 @@ Open a file immediately:
 ```bash
 ./build/pixelscope /path/to/image.png
 ```
+
+## Settings Storage
+
+PixelScope stores Dear ImGui window layout and UI state in the per-user application settings directory instead of the current working directory.
+
+- macOS: `~/Library/Application Support/PixelScope/imgui.ini`
+- Linux: `${XDG_CONFIG_HOME:-~/.config}/pixelscope/imgui.ini`
+- Windows: `%AppData%\PixelScope\imgui.ini`
+
+This keeps published builds from writing `imgui.ini` next to the executable or into whichever folder the app was launched from.
+
+## Install Staging
+
+To stage an install tree locally:
+
+```bash
+cmake --install build --prefix install
+```
+
+This installs:
+
+- `pixelscope`
+- `rawloader_bridge`
+- `metadata_bridge`
+- license and bundled icons
+
+The Rust helpers are installed next to the main executable so the app can locate them after being moved or packaged.
+
+## Release Artifacts
+
+The repository includes a GitHub Actions release workflow at `.github/workflows/release.yml`.
+
+- Tagging `v0.1.0` style releases builds Linux, macOS, and Windows artifacts.
+- Linux packages are emitted as `.tar.gz`.
+- macOS and Windows packages are emitted as `.zip`.
+
+The workflow currently scaffolds portable release archives. Code signing, notarization, DMG creation, MSI/EXE installers, Homebrew, `winget`, and AppImage/Flatpak publishing are good next steps once the archive-based release flow is stable.
 
 After launch you can also open files from:
 

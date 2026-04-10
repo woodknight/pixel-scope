@@ -17,6 +17,7 @@
 #include "io/dng_loader.h"
 #include "io/file_dialog.h"
 #include "io/image_loader.h"
+#include "platform/runtime_paths.h"
 
 namespace pixelscope::ui {
 
@@ -259,6 +260,8 @@ bool App::initialize() {
   ImGui::CreateContext();
   ImGuiIO& io = ImGui::GetIO();
   io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+  imgui_ini_path_ = pixelscope::platform::imgui_ini_path().string();
+  io.IniFilename = imgui_ini_path_.c_str();
 
   ImGui::StyleColorsDark();
   ImGuiStyle& style = ImGui::GetStyle();
