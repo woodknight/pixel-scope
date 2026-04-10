@@ -58,10 +58,24 @@ jobs:
             cmake \
             git \
             pkg-config \
+            libasound2-dev \
             libtiff-dev \
             libgl1-mesa-dev \
             libegl1-mesa-dev \
-            libgles2-mesa-dev
+            libgles2-mesa-dev \
+            libx11-dev \
+            libxext-dev \
+            libxcursor-dev \
+            libxi-dev \
+            libxfixes-dev \
+            libxrandr-dev \
+            libxrender-dev \
+            libxss-dev \
+            libdrm-dev \
+            libgbm-dev \
+            libwayland-dev \
+            libxkbcommon-dev \
+            libdecor-0-dev
 
       - name: Install macOS system dependencies
         if: runner.os == 'macOS'
