@@ -253,9 +253,11 @@ The Rust helpers are installed next to the main executable so the app can locate
 
 The repository includes a GitHub Actions release workflow at `.github/workflows/release.yml`.
 
-- Tagging `v0.1.0` style releases builds Linux, macOS, and Windows artifacts.
+- `workflow_dispatch` builds Linux, macOS, and Windows artifacts and uploads them as workflow artifacts.
+- Tagging `v0.1.0` style releases builds the same matrix and only publishes release assets if every job passes.
 - Linux packages are emitted as `.tar.gz`.
 - macOS and Windows packages are emitted as `.zip`.
+- Uploaded artifact names are normalized to `pixelscope-<version>-<platform>.<ext>`.
 
 The workflow currently scaffolds portable release archives. Code signing, notarization, DMG creation, MSI/EXE installers, Homebrew, `winget`, and AppImage/Flatpak publishing are good next steps once the archive-based release flow is stable.
 

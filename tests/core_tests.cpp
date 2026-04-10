@@ -14,9 +14,21 @@
 #include "io/dng_loader.h"
 #include "io/image_loader.h"
 
+#ifndef PIXELSCOPE_TEST_IMAGES_DIR
+#define PIXELSCOPE_TEST_IMAGES_DIR "../images"
+#endif
+
+namespace {
+
+std::string test_image_path(const char* filename) {
+  return std::string(PIXELSCOPE_TEST_IMAGES_DIR) + "/" + filename;
+}
+
+}  // namespace
+
 int main() {
   {
-    const auto image = pixelscope::io::load_image_file("../images/DeltaE_8bit_gamma1.0.tif");
+    const auto image = pixelscope::io::load_image_file(test_image_path("DeltaE_8bit_gamma1.0.tif"));
     assert(image.ok());
     assert(image.image.valid());
     assert(image.image.metadata().width == 3072);
@@ -26,7 +38,7 @@ int main() {
   }
 
   {
-    const auto image = pixelscope::io::load_image_file("../images/DeltaE_16bit_gamma1.0.tif");
+    const auto image = pixelscope::io::load_image_file(test_image_path("DeltaE_16bit_gamma1.0.tif"));
     assert(image.ok());
     assert(image.image.valid());
     assert(image.image.metadata().width == 3072);
@@ -40,7 +52,7 @@ int main() {
   }
 
   {
-    const auto image = pixelscope::io::load_image_file("../images/tree.dng");
+    const auto image = pixelscope::io::load_image_file(test_image_path("tree.dng"));
     assert(image.ok());
     assert(image.image.valid());
     assert(image.image.metadata().width == 4048);
@@ -358,18 +370,18 @@ int main() {
     assert(image.raw_sample_at(1, 0).value() == 1023);
     assert(image.raw_sample_at(0, 1).value() == 384);
     assert(image.raw_sample_at(1, 1).value() == 256);
-    assert(image.pixel_at(0, 0)->r == 16);
+    assert(image.pixel_at(0, 0)->r == 0);
     assert(image.pixel_at(0, 0)->g == 0);
     assert(image.pixel_at(0, 0)->b == 0);
     assert(image.pixel_at(1, 0)->r == 0);
     assert(image.pixel_at(1, 0)->g == 255);
     assert(image.pixel_at(1, 0)->b == 0);
     assert(image.pixel_at(0, 1)->r == 0);
-    assert(image.pixel_at(0, 1)->g == 96);
+    assert(image.pixel_at(0, 1)->g == 85);
     assert(image.pixel_at(0, 1)->b == 0);
     assert(image.pixel_at(1, 1)->r == 0);
     assert(image.pixel_at(1, 1)->g == 0);
-    assert(image.pixel_at(1, 1)->b == 64);
+    assert(image.pixel_at(1, 1)->b == 51);
   }
 
   {

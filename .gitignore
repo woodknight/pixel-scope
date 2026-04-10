@@ -1,4 +1,8 @@
 build/
+install/
 .cache/
 images/
 .vscode/
+_CPack_Packages/
+PixelScope-*.tar.gz
+PixelScope-*.zip

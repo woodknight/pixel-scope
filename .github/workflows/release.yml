@@ -6,9 +6,6 @@ on:
     tags:
       - "v*"
 
-permissions:
-  contents: write
-
 jobs:
   build:
     name: ${{ matrix.name }}
@@ -20,16 +17,33 @@ jobs:
           - name: Linux
             os: ubuntu-latest
             cpack_generator: TGZ
+            artifact_suffix: linux-x86_64
+            package_extension: tar.gz
           - name: macOS
             os: macos-latest
             cpack_generator: ZIP
+            artifact_suffix: macos-x86_64
+            package_extension: zip
           - name: Windows
             os: windows-latest
             cpack_generator: ZIP
+            artifact_suffix: windows-x86_64
+            package_extension: zip
 
     steps:
       - name: Check out source
         uses: actions/checkout@v4
+
+      - name: Resolve release version
+        id: version
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            version="${GITHUB_REF_NAME#v}"
+          else
+            version="dev-${GITHUB_SHA::7}"
+          fi
+          echo "value=${version}" >> "$GITHUB_OUTPUT"
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -87,18 +101,43 @@ jobs:
         shell: bash
         run: cpack -G "${{ matrix.cpack_generator }}" -C Release
 
-      - name: Upload workflow artifacts
+      - name: Normalize package filename
+        shell: bash
+        run: |
+          mkdir -p dist
+          package_path="$(find build -maxdepth 1 -type f \( -name '*.zip' -o -name '*.tar.gz' \) | head -n 1)"
+          if [[ -z "${package_path}" ]]; then
+            echo "No package produced by CPack" >&2
+            exit 1
+          fi
+          cp "${package_path}" \
+            "dist/pixelscope-${{ steps.version.outputs.value }}-${{ matrix.artifact_suffix }}.${{ matrix.package_extension }}"
+
+      - name: Upload workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: pixelscope-${{ runner.os }}
-          path: |
-            build/*.zip
-            build/*.tar.gz
+          name: pixelscope-${{ steps.version.outputs.value }}-${{ matrix.artifact_suffix }}
+          path: dist/pixelscope-${{ steps.version.outputs.value }}-${{ matrix.artifact_suffix }}.${{ matrix.package_extension }}
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    name: Publish Release
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref_type == 'tag'
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download packaged artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          pattern: pixelscope-*
+          merge-multiple: true
 
       - name: Publish GitHub release assets
-        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            build/*.zip
-            build/*.tar.gz
+          files: release-assets/*

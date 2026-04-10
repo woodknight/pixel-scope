@@ -182,6 +182,10 @@ endif()
 
 if(PIXELSCOPE_BUILD_TESTS)
   add_executable(pixelscope_tests tests/core_tests.cpp)
+  target_compile_definitions(
+    pixelscope_tests
+    PRIVATE PIXELSCOPE_TEST_IMAGES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/images"
+  )
   target_link_libraries(pixelscope_tests PRIVATE pixelscope_core)
   add_test(NAME pixelscope_tests COMMAND pixelscope_tests)
 endif()
