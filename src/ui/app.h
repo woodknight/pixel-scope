@@ -69,6 +69,12 @@ class App {
   void draw_canvas();
   void draw_hover_overlay(const ImVec2& canvas_pos);
   void draw_histogram_overlay(const pixelscope::core::Rect& canvas_rect);
+  void draw_minimap_overlay(
+      const pixelscope::core::Rect& canvas_rect,
+      const pixelscope::core::Rect& image_bounds,
+      SDL_Texture* texture,
+      int image_width,
+      int image_height);
   void draw_statistics_overlay(const pixelscope::core::Rect& canvas_rect);
   void draw_metadata_overlay(const pixelscope::core::Rect& canvas_rect);
   void draw_status_bar();

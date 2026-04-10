@@ -31,6 +31,11 @@ constexpr float kGridMinZoom = 8.0f;
 constexpr float kHistogramOverlayWidth = 240.0f;
 constexpr float kHistogramOverlayHeight = 128.0f;
 constexpr float kHistogramOverlayMargin = 16.0f;
+constexpr float kMinimapMaxWidth = 180.0f;
+constexpr float kMinimapMaxHeight = 180.0f;
+constexpr float kMinimapMinWidth = 96.0f;
+constexpr float kMinimapMinHeight = 96.0f;
+constexpr float kMinimapPadding = 8.0f;
 constexpr float kHoverOverlayMargin = 16.0f;
 constexpr float kStatisticsOverlayWidth = 260.0f;
 constexpr float kMetadataOverlayWidth = 360.0f;
@@ -864,6 +869,12 @@ void App::draw_canvas() {
           source_image.metadata().height,
           view_.zoom);
     }
+    draw_minimap_overlay(
+        canvas_rect,
+        image_bounds,
+        texture,
+        source_image.metadata().width,
+        source_image.metadata().height);
   }
 
   const bool hovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
@@ -961,6 +972,93 @@ void App::draw_hover_overlay(const ImVec2& canvas_pos) {
   }
 
   ImGui::End();
+}
+
+void App::draw_minimap_overlay(
+    const pixelscope::core::Rect& canvas_rect,
+    const pixelscope::core::Rect& image_bounds,
+    SDL_Texture* texture,
+    int image_width,
+    int image_height) {
+  if (texture == nullptr || image_width <= 0 || image_height <= 0) {
+    return;
+  }
+
+  const float visible_min_x = std::max(canvas_rect.x, image_bounds.x);
+  const float visible_min_y = std::max(canvas_rect.y, image_bounds.y);
+  const float visible_max_x = std::min(canvas_rect.x + canvas_rect.w, image_bounds.x + image_bounds.w);
+  const float visible_max_y = std::min(canvas_rect.y + canvas_rect.h, image_bounds.y + image_bounds.h);
+  if (visible_min_x >= visible_max_x || visible_min_y >= visible_max_y || image_bounds.w <= 0.0f ||
+      image_bounds.h <= 0.0f) {
+    return;
+  }
+
+  const float visible_u0 = std::clamp((visible_min_x - image_bounds.x) / image_bounds.w, 0.0f, 1.0f);
+  const float visible_v0 = std::clamp((visible_min_y - image_bounds.y) / image_bounds.h, 0.0f, 1.0f);
+  const float visible_u1 = std::clamp((visible_max_x - image_bounds.x) / image_bounds.w, 0.0f, 1.0f);
+  const float visible_v1 = std::clamp((visible_max_y - image_bounds.y) / image_bounds.h, 0.0f, 1.0f);
+  if ((visible_u1 - visible_u0) >= 0.999f && (visible_v1 - visible_v0) >= 0.999f) {
+    return;
+  }
+
+  ImDrawList* draw_list = ImGui::GetWindowDrawList();
+  if (draw_list == nullptr) {
+    return;
+  }
+
+  const float margin = kHistogramOverlayMargin * ui_scale_;
+  const float padding = kMinimapPadding * ui_scale_;
+  const float available_width = std::max(1.0f, canvas_rect.w - margin * 2.0f - padding * 2.0f);
+  const float available_height = std::max(1.0f, canvas_rect.h - margin * 2.0f - padding * 2.0f);
+  const float max_thumb_width = std::min(kMinimapMaxWidth * ui_scale_, available_width);
+  const float max_thumb_height = std::min(kMinimapMaxHeight * ui_scale_, available_height);
+  const float image_aspect = static_cast<float>(image_width) / static_cast<float>(image_height);
+
+  float thumb_width = max_thumb_width;
+  float thumb_height = thumb_width / image_aspect;
+  if (thumb_height > max_thumb_height) {
+    thumb_height = max_thumb_height;
+    thumb_width = thumb_height * image_aspect;
+  }
+  if (thumb_width < std::min(kMinimapMinWidth * ui_scale_, available_width)) {
+    thumb_width = std::min(kMinimapMinWidth * ui_scale_, available_width);
+    thumb_height = thumb_width / image_aspect;
+  }
+  if (thumb_height < std::min(kMinimapMinHeight * ui_scale_, available_height)) {
+    thumb_height = std::min(kMinimapMinHeight * ui_scale_, available_height);
+    thumb_width = thumb_height * image_aspect;
+  }
+  if (thumb_width > available_width) {
+    thumb_width = available_width;
+    thumb_height = thumb_width / image_aspect;
+  }
+  if (thumb_height > available_height) {
+    thumb_height = available_height;
+    thumb_width = thumb_height * image_aspect;
+  }
+
+  const ImVec2 outer_min(
+      canvas_rect.x + canvas_rect.w - thumb_width - (padding * 2.0f) - margin,
+      canvas_rect.y + canvas_rect.h - thumb_height - (padding * 2.0f) - margin);
+  const ImVec2 outer_max(
+      outer_min.x + thumb_width + (padding * 2.0f),
+      outer_min.y + thumb_height + (padding * 2.0f));
+  const ImVec2 thumb_min(outer_min.x + padding, outer_min.y + padding);
+  const ImVec2 thumb_max(thumb_min.x + thumb_width, thumb_min.y + thumb_height);
+
+  const ImVec2 fov_min(
+      thumb_min.x + visible_u0 * thumb_width,
+      thumb_min.y + visible_v0 * thumb_height);
+  const ImVec2 fov_max(
+      thumb_min.x + visible_u1 * thumb_width,
+      thumb_min.y + visible_v1 * thumb_height);
+
+  draw_list->AddRectFilled(outer_min, outer_max, IM_COL32(10, 12, 16, 220), 6.0f);
+  draw_list->AddRect(outer_min, outer_max, IM_COL32(190, 194, 204, 90), 6.0f, 0, 1.0f);
+  draw_list->AddImage(reinterpret_cast<ImTextureID>(texture), thumb_min, thumb_max);
+  draw_list->AddRect(thumb_min, thumb_max, IM_COL32(255, 255, 255, 36), 0.0f, 0, 1.0f);
+  draw_list->AddRectFilled(fov_min, fov_max, IM_COL32(255, 255, 255, 26), 0.0f);
+  draw_list->AddRect(fov_min, fov_max, IM_COL32(255, 200, 96, 255), 0.0f, 0, 2.0f * ui_scale_);
 }
 
 void App::draw_histogram_overlay(const pixelscope::core::Rect& canvas_rect) {
