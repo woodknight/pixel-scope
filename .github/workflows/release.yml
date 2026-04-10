@@ -72,7 +72,8 @@ jobs:
         if: runner.os == 'Windows'
         uses: lukka/run-vcpkg@v11
         with:
-          vcpkgJsonGlob: vcpkg.json
+          vcpkgGitCommitId: afeb285c9e2e015292985856b9382ea1d82a4492
+          vcpkgJsonGlob: '**/vcpkg.json'
 
       - name: Configure
         shell: bash
