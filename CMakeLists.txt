@@ -209,9 +209,9 @@ endif()
 
 if(WIN32)
   install(TARGETS pixelscope
+    RUNTIME_DEPENDENCY_SET pixelscope_runtime_deps
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     BUNDLE DESTINATION .
-    RUNTIME_DEPENDENCY_SET pixelscope_runtime_deps
   )
 
   install(
