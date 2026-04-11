@@ -6,3 +6,4 @@ images/
 _CPack_Packages/
 PixelScope-*.tar.gz
 PixelScope-*.zip
+packaging/winget/out/
