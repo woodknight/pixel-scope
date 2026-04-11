@@ -134,7 +134,7 @@ jobs:
 
       - name: Install staging tree
         shell: bash
-        run: cmake --install build --config Release --prefix install
+        run: cmake --install build --config Release --prefix "$PWD/install"
 
       - name: Package archive
         shell: bash
@@ -154,7 +154,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p dist AppDir/usr
-          cmake --install build --prefix AppDir/usr
+          cmake --install build --prefix "$PWD/AppDir/usr"
           mkdir -p AppDir/usr/lib
           cp -a build/_deps/sdl2-build/libSDL2-2.0.so* AppDir/usr/lib/
           install -Dm755 packaging/linux/AppRun AppDir/AppRun
