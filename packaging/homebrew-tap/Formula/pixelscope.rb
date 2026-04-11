@@ -8,7 +8,7 @@ class Pixelscope < Formula
 
   def install
     libexec.install Dir["*"]
-    bin.write_exec_script libexec/"PixelScope-0.1.4-Darwin-arm64/bin/pixelscope"
+    bin.write_exec_script libexec/"bin/pixelscope"
   end
 
   test do
