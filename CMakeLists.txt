@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 
-project(PixelScope VERSION 0.1.2 LANGUAGES CXX C)
+project(PixelScope VERSION 0.1.3 LANGUAGES CXX C)
 
 include(FetchContent)
 include(CTest)

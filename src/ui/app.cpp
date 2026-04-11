@@ -14,6 +14,8 @@
 #include <backends/imgui_impl_sdl2.h>
 #include <backends/imgui_impl_sdlrenderer2.h>
 
+#include <stb_image.h>
+
 #include "io/dng_loader.h"
 #include "io/file_dialog.h"
 #include "io/image_loader.h"
@@ -309,6 +311,26 @@ namespace pixelscope::ui
     {
       last_error_ = SDL_GetError();
       return false;
+    }
+
+    {
+      const auto icon_path = pixelscope::platform::resolve_icon_path();
+      if (!icon_path.empty())
+      {
+        int iw = 0, ih = 0, channels = 0;
+        unsigned char *pixels = stbi_load(icon_path.string().c_str(), &iw, &ih, &channels, 4);
+        if (pixels != nullptr)
+        {
+          SDL_Surface *icon = SDL_CreateRGBSurfaceWithFormatFrom(
+              pixels, iw, ih, 32, iw * 4, SDL_PIXELFORMAT_RGBA32);
+          if (icon != nullptr)
+          {
+            SDL_SetWindowIcon(window_, icon);
+            SDL_FreeSurface(icon);
+          }
+          stbi_image_free(pixels);
+        }
+      }
     }
 
     if (!create_renderer())
