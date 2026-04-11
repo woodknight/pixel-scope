@@ -6,6 +6,12 @@ include(FetchContent)
 include(CTest)
 include(GNUInstallDirs)
 
+if(WIN32)
+  set(CMAKE_INSTALL_SYSTEM_RUNTIME_DESTINATION ${CMAKE_INSTALL_BINDIR})
+  set(CMAKE_INSTALL_UCRT_LIBRARIES TRUE)
+  include(InstallRequiredSystemLibraries)
+endif()
+
 find_package(TIFF REQUIRED)
 
 if(POLICY CMP0169)
@@ -201,23 +207,31 @@ if(PIXELSCOPE_BUILD_TESTS)
   add_test(NAME pixelscope_tests COMMAND pixelscope_tests)
 endif()
 
-install(TARGETS pixelscope
-  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-  BUNDLE DESTINATION .
-)
+if(WIN32)
+  install(TARGETS pixelscope
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    BUNDLE DESTINATION .
+    RUNTIME_DEPENDENCY_SET pixelscope_runtime_deps
+  )
+
+  install(
+    RUNTIME_DEPENDENCY_SET pixelscope_runtime_deps
+    DESTINATION ${CMAKE_INSTALL_BINDIR}
+    PRE_EXCLUDE_REGEXES "api-ms-" "ext-ms-"
+    POST_EXCLUDE_REGEXES ".*/[Ss]ystem32/.*"
+  )
+else()
+  install(TARGETS pixelscope
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    BUNDLE DESTINATION .
+  )
+endif()
 
 install(PROGRAMS
   "${RAWLOADER_BRIDGE_EXECUTABLE}"
   "${METADATA_BRIDGE_EXECUTABLE}"
   DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
-
-if(WIN32)
-  install(FILES $<TARGET_RUNTIME_DLLS:pixelscope>
-    DESTINATION ${CMAKE_INSTALL_BINDIR}
-    COMPONENT Runtime
-  )
-endif()
 
 install(FILES
   LICENSE

@@ -192,6 +192,38 @@ jobs:
             esac
           done < <(find packages -maxdepth 1 -type f \( -name '*.zip' -o -name '*.tar.gz' -o -name '*.exe' \) -print0)
 
+      - name: Verify Windows package contents
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          python - <<'PY'
+          import pathlib
+          import zipfile
+
+          zip_path = next(pathlib.Path("dist").glob("*.zip"))
+          with zipfile.ZipFile(zip_path) as archive:
+              names = archive.namelist()
+
+          required_patterns = [
+              "/bin/pixelscope.exe",
+              "/bin/SDL2.dll",
+              "/bin/vcruntime",
+              "/bin/msvcp",
+          ]
+
+          missing = []
+          lower_names = [name.lower() for name in names]
+          for pattern in required_patterns:
+              if not any(pattern in name for name in lower_names):
+                  missing.append(pattern)
+
+          if missing:
+              raise SystemExit(
+                  "Windows package is missing required runtime files: "
+                  + ", ".join(missing)
+              )
+          PY
+
       - name: Generate checksums
         shell: bash
         run: |
