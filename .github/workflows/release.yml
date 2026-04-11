@@ -192,24 +192,52 @@ jobs:
             esac
           done < <(find packages -maxdepth 1 -type f \( -name '*.zip' -o -name '*.tar.gz' -o -name '*.exe' \) -print0)
 
-      - name: Verify Windows package contents
-        if: runner.os == 'Windows'
+      - name: Verify packaged archive contents
         shell: bash
         run: |
           python - <<'PY'
+          import os
           import pathlib
+          import tarfile
           import zipfile
 
-          zip_path = next(pathlib.Path("dist").glob("*.zip"))
-          with zipfile.ZipFile(zip_path) as archive:
-              names = archive.namelist()
+          runner_os = os.environ["RUNNER_OS"]
+          dist_dir = pathlib.Path("dist")
 
-          required_patterns = [
-              "/bin/pixelscope.exe",
-              "/bin/SDL2.dll",
-              "/bin/vcruntime",
-              "/bin/msvcp",
-          ]
+          if runner_os == "Linux":
+              archive_path = next(dist_dir.glob("*.tar.gz"))
+              with tarfile.open(archive_path, "r:gz") as archive:
+                  names = archive.getnames()
+              required_patterns = [
+                  "/bin/pixelscope",
+                  "/bin/rawloader_bridge",
+                  "/bin/metadata_bridge",
+                  "/lib/libsdl2",
+                  "/lib/libtiff",
+              ]
+          else:
+              archive_path = next(dist_dir.glob("*.zip"))
+              with zipfile.ZipFile(archive_path) as archive:
+                  names = archive.namelist()
+
+              if runner_os == "macOS":
+                  required_patterns = [
+                      "/bin/pixelscope",
+                      "/bin/rawloader_bridge",
+                      "/bin/metadata_bridge",
+                      "/frameworks/libsdl2",
+                      "/frameworks/libtiff",
+                  ]
+              else:
+                  required_patterns = [
+                      "/bin/pixelscope.exe",
+                      "/bin/rawloader_bridge.exe",
+                      "/bin/metadata_bridge.exe",
+                      "/bin/sdl2.dll",
+                      "/bin/tiff",
+                      "/bin/vcruntime",
+                      "/bin/msvcp",
+                  ]
 
           missing = []
           lower_names = [name.lower() for name in names]
@@ -219,7 +247,7 @@ jobs:
 
           if missing:
               raise SystemExit(
-                  "Windows package is missing required runtime files: "
+                  f"{runner_os} package is missing required runtime files: "
                   + ", ".join(missing)
               )
           PY

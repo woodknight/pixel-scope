@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 
-project(PixelScope VERSION 0.1.0 LANGUAGES CXX C)
+project(PixelScope VERSION 0.1.2 LANGUAGES CXX C)
 
 include(FetchContent)
 include(CTest)
@@ -179,6 +179,23 @@ add_dependencies(pixelscope_core rawloader_bridge_build metadata_bridge_build)
 add_executable(pixelscope src/main.cpp)
 target_link_libraries(pixelscope PRIVATE pixelscope_core)
 
+set(PIXELSCOPE_SHARED_LIBRARY_DESTINATION ${CMAKE_INSTALL_LIBDIR})
+if(WIN32)
+  set(PIXELSCOPE_SHARED_LIBRARY_DESTINATION ${CMAKE_INSTALL_BINDIR})
+elseif(APPLE)
+  set(PIXELSCOPE_SHARED_LIBRARY_DESTINATION Frameworks)
+endif()
+
+if(APPLE)
+  set_target_properties(pixelscope PROPERTIES
+    INSTALL_RPATH "@executable_path/../Frameworks"
+  )
+elseif(UNIX)
+  set_target_properties(pixelscope PROPERTIES
+    INSTALL_RPATH "$ORIGIN/../${CMAKE_INSTALL_LIBDIR}"
+  )
+endif()
+
 if(WIN32)
   target_link_libraries(pixelscope PRIVATE SDL2::SDL2main)
   add_custom_command(TARGET pixelscope POST_BUILD
@@ -209,21 +226,8 @@ endif()
 
 if(WIN32)
   install(TARGETS pixelscope
-    RUNTIME_DEPENDENCY_SET pixelscope_runtime_deps
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     BUNDLE DESTINATION .
-  )
-
-  install(
-    RUNTIME_DEPENDENCY_SET pixelscope_runtime_deps
-    DESTINATION ${CMAKE_INSTALL_BINDIR}
-    PRE_EXCLUDE_REGEXES
-      "api-ms-"
-      "ext-ms-"
-      ".*[Hh][Vv][Ss][Ii][Ff]ile[Tt]rust\\.dll"
-      ".*[Ww][Tt][Dd][Cc][Cc][Mm]\\.dll"
-    POST_EXCLUDE_REGEXES
-      ".*/[Ss]ystem32/.*"
   )
 else()
   install(TARGETS pixelscope
@@ -232,11 +236,97 @@ else()
   )
 endif()
 
+install(TARGETS SDL2
+  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+  LIBRARY DESTINATION ${PIXELSCOPE_SHARED_LIBRARY_DESTINATION}
+  FRAMEWORK DESTINATION ${PIXELSCOPE_SHARED_LIBRARY_DESTINATION}
+)
+
+set(PIXELSCOPE_TIFF_RUNTIME_TARGET "")
+if(TARGET TIFF::tiff)
+  set(PIXELSCOPE_TIFF_RUNTIME_TARGET TIFF::tiff)
+elseif(TARGET TIFF::TIFF)
+  set(PIXELSCOPE_TIFF_RUNTIME_TARGET TIFF::TIFF)
+endif()
+
+set(PIXELSCOPE_TIFF_RUNTIME_FILES "")
+if(PIXELSCOPE_TIFF_RUNTIME_TARGET)
+  foreach(config_prop
+      IMPORTED_LOCATION
+      IMPORTED_LOCATION_RELEASE
+      IMPORTED_LOCATION_RELWITHDEBINFO
+      IMPORTED_LOCATION_MINSIZEREL
+      IMPORTED_LOCATION_DEBUG)
+    get_target_property(PIXELSCOPE_TIFF_RUNTIME_FILE ${PIXELSCOPE_TIFF_RUNTIME_TARGET} ${config_prop})
+    if(PIXELSCOPE_TIFF_RUNTIME_FILE AND EXISTS "${PIXELSCOPE_TIFF_RUNTIME_FILE}")
+      list(APPEND PIXELSCOPE_TIFF_RUNTIME_FILES "${PIXELSCOPE_TIFF_RUNTIME_FILE}")
+    endif()
+  endforeach()
+  list(REMOVE_DUPLICATES PIXELSCOPE_TIFF_RUNTIME_FILES)
+endif()
+
+if(PIXELSCOPE_TIFF_RUNTIME_FILES)
+  install(FILES ${PIXELSCOPE_TIFF_RUNTIME_FILES}
+    DESTINATION ${PIXELSCOPE_SHARED_LIBRARY_DESTINATION}
+  )
+endif()
+
 install(PROGRAMS
   "${RAWLOADER_BRIDGE_EXECUTABLE}"
   "${METADATA_BRIDGE_EXECUTABLE}"
   DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
+
+if(WIN32)
+  install(CODE [[
+    file(GET_RUNTIME_DEPENDENCIES
+      RESOLVED_DEPENDENCIES_VAR pixelscope_resolved_runtime_deps
+      UNRESOLVED_DEPENDENCIES_VAR pixelscope_unresolved_runtime_deps
+      EXECUTABLES
+        "$<TARGET_FILE:pixelscope>"
+        "]] "${RAWLOADER_BRIDGE_EXECUTABLE}" [["
+        "]] "${METADATA_BRIDGE_EXECUTABLE}" [["
+      DIRECTORIES
+        "$<TARGET_FILE_DIR:pixelscope>"
+        "]] "${RAWLOADER_BRIDGE_TARGET_DIR}/release" [["
+        "]] "${METADATA_BRIDGE_TARGET_DIR}/release" [["
+      PRE_EXCLUDE_REGEXES
+        "api-ms-"
+        "ext-ms-"
+        ".*[Hh][Vv][Ss][Ii][Ff]ile[Tt]rust\\.dll"
+        ".*[Ww][Tt][Dd][Cc][Cc][Mm]\\.dll"
+      POST_EXCLUDE_REGEXES
+        ".*/[Ss]ystem32/.*"
+    )
+
+    if(pixelscope_unresolved_runtime_deps)
+      list(JOIN pixelscope_unresolved_runtime_deps ", " pixelscope_unresolved_runtime_deps_message)
+      message(FATAL_ERROR
+        "Unresolved Windows runtime dependencies: ${pixelscope_unresolved_runtime_deps_message}"
+      )
+    endif()
+
+    list(REMOVE_DUPLICATES pixelscope_resolved_runtime_deps)
+    foreach(runtime_dependency IN LISTS pixelscope_resolved_runtime_deps)
+      file(INSTALL
+        DESTINATION "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR}"
+        TYPE SHARED_LIBRARY
+        FILES "${runtime_dependency}"
+      )
+    endforeach()
+  ]])
+endif()
+
+if(APPLE)
+  install(CODE [[
+    include(BundleUtilities)
+    fixup_bundle(
+      "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR}/pixelscope"
+      ""
+      "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR};${CMAKE_INSTALL_PREFIX}/Frameworks"
+    )
+  ]])
+endif()
 
 install(FILES
   LICENSE
