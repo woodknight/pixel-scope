@@ -52,12 +52,22 @@ class Pixelscope < Formula
     PLIST
   end
 
+  def post_install
+    # Register the .app bundle with Launch Services so Spotlight can find it
+    # even when it lives inside the Cellar.
+    system "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister",
+           "-f", "#{prefix}/PixelScope.app"
+  end
+
   def caveats
     <<~EOS
-      To add PixelScope to your Applications folder:
-        ln -sf #{prefix}/PixelScope.app /Applications/PixelScope.app
-      To remove the link:
-        rm /Applications/PixelScope.app
+      PixelScope.app has been created in the Cellar. To make it appear in
+      Launchpad and Finder's Applications, run:
+
+        cp -R #{prefix}/PixelScope.app ~/Applications/
+
+      To remove later:
+        rm -rf ~/Applications/PixelScope.app
     EOS
   end
 

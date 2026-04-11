@@ -17,6 +17,18 @@ brew tap woodknight/tap
 brew install woodknight/tap/pixelscope
 ```
 
+After installation, to make PixelScope appear in **Launchpad** and **Finder's Applications**:
+
+```bash
+cp -R $(brew --prefix pixelscope)/PixelScope.app ~/Applications/
+```
+
+The app will also be searchable in **Spotlight** after install. To remove the app bundle later:
+
+```bash
+rm -rf ~/Applications/PixelScope.app
+```
+
 ### Windows
 
 Download the latest installer from the [Releases](https://github.com/woodknight/pixel-scope/releases) page:
@@ -288,16 +300,21 @@ The repository includes a GitHub Actions release workflow at `.github/workflows/
 - Uploaded artifact names are normalized to `pixelscope-<version>-<platform>.<ext>`.
 - Each artifact set also includes a platform-specific checksum file such as `SHA256SUMS-linux-x86_64.txt`.
 
-The workflow currently scaffolds portable release archives. Code signing, notarization, DMG creation, MSI/EXE installers, Homebrew, `winget`, and AppImage/Flatpak publishing are good next steps once the archive-based release flow is stable.
+The workflow currently scaffolds portable release archives. Code signing, notarization, and DMG creation are good next steps once the archive-based release flow is stable.
 
 ## Package Managers
 
 This repository includes downstream publishing metadata:
 
-- Homebrew tap scaffold: `packaging/homebrew-tap/`
+- Homebrew tap: `packaging/homebrew-tap/` — published to [`woodknight/homebrew-tap`](https://github.com/woodknight/homebrew-tap). The formula installs the CLI binary and creates a macOS `.app` bundle with icon and `Info.plist` for Spotlight and Launchpad integration.
 - winget submission bundle: `packaging/winget/`
 
-These files are intended as release-aligned publishing artifacts you can submit to your Homebrew tap and the `microsoft/winget-pkgs` repository.
+The Homebrew formula is available via:
+
+```bash
+brew tap woodknight/tap
+brew install pixelscope
+```
 
 After launch you can also open files from:
 
