@@ -327,9 +327,10 @@ endforeach()
     OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/InstallWindowsRuntimeDeps-$<CONFIG>.cmake"
     CONTENT "${PIXELSCOPE_WINDOWS_INSTALL_SCRIPT}"
   )
-  install(CODE [[
-    include("${CMAKE_CURRENT_BINARY_DIR}/InstallWindowsRuntimeDeps-${CMAKE_INSTALL_CONFIG_NAME}.cmake")
-  ]])
+  set(PIXELSCOPE_WINDOWS_INSTALL_INCLUDE_CODE
+    "include(\"${CMAKE_CURRENT_BINARY_DIR}/InstallWindowsRuntimeDeps-\${CMAKE_INSTALL_CONFIG_NAME}.cmake\")"
+  )
+  install(CODE "${PIXELSCOPE_WINDOWS_INSTALL_INCLUDE_CODE}")
 endif()
 
 if(APPLE)
@@ -347,9 +348,10 @@ fixup_bundle("${pixelscope_installed_executable}" "" "${pixelscope_bundle_search
     OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/InstallMacRuntimeFixup-$<CONFIG>.cmake"
     CONTENT "${PIXELSCOPE_MAC_INSTALL_SCRIPT}"
   )
-  install(CODE [[
-    include("${CMAKE_CURRENT_BINARY_DIR}/InstallMacRuntimeFixup-${CMAKE_INSTALL_CONFIG_NAME}.cmake")
-  ]])
+  set(PIXELSCOPE_MAC_INSTALL_INCLUDE_CODE
+    "include(\"${CMAKE_CURRENT_BINARY_DIR}/InstallMacRuntimeFixup-\${CMAKE_INSTALL_CONFIG_NAME}.cmake\")"
+  )
+  install(CODE "${PIXELSCOPE_MAC_INSTALL_INCLUDE_CODE}")
 endif()
 
 install(FILES
