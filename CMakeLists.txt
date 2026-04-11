@@ -217,11 +217,13 @@ if(WIN32)
   install(
     RUNTIME_DEPENDENCY_SET pixelscope_runtime_deps
     DESTINATION ${CMAKE_INSTALL_BINDIR}
-    PRE_EXCLUDE_REGEXES "api-ms-" "ext-ms-"
-    POST_EXCLUDE_REGEXES
-      ".*/[Ss]ystem32/.*"
+    PRE_EXCLUDE_REGEXES
+      "api-ms-"
+      "ext-ms-"
       ".*[Hh][Vv][Ss][Ii][Ff]ile[Tt]rust\\.dll"
       ".*[Ww][Tt][Dd][Cc][Cc][Mm]\\.dll"
+    POST_EXCLUDE_REGEXES
+      ".*/[Ss]ystem32/.*"
   )
 else()
   install(TARGETS pixelscope
