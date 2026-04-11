@@ -8,6 +8,33 @@ The current app is a lightweight, efficient, minimalist SDL2 + Dear ImGui deskto
 
 ![PixelScope screenshot](assets/Screenshot.png)
 
+## Install
+
+### macOS (Homebrew)
+
+```bash
+brew tap woodknight/tap
+brew install woodknight/tap/pixelscope
+```
+
+### Windows
+
+Download the latest installer from the [Releases](https://github.com/woodknight/pixel-scope/releases) page:
+
+- `pixelscope-<version>-windows-x86_64-setup.exe` — NSIS installer, adds PixelScope to the Start Menu.
+- `pixelscope-<version>-windows-x86_64.zip` — portable ZIP, no installation required, just extract and run `bin\pixelscope.exe`.
+
+### Linux (AppImage)
+
+Download the latest AppImage from the [Releases](https://github.com/woodknight/pixel-scope/releases) page:
+
+```bash
+chmod +x pixelscope-<version>-linux-x86_64.AppImage
+./pixelscope-<version>-linux-x86_64.AppImage
+```
+
+Alternatively, download the `.tar.gz` archive, extract it, and run `bin/pixelscope`.
+
 ## What It Does
 
 PixelScope is designed around a simple idea: the value you inspect should come from the source image, not from a scaled presentation layer.
