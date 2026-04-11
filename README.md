@@ -267,8 +267,8 @@ The workflow currently scaffolds portable release archives. Code signing, notari
 
 This repository includes downstream publishing metadata:
 
-- Homebrew formula scaffold: `packaging/homebrew/Formula/pixelscope.rb`
-- winget manifests: `packaging/winget/manifests/Woodknight/PixelScope/0.1.0/`
+- Homebrew tap scaffold: `packaging/homebrew-tap/`
+- winget submission bundle: `packaging/winget/`
 
 These files are intended as release-aligned publishing artifacts you can submit to your Homebrew tap and the `microsoft/winget-pkgs` repository.
 
