@@ -12,8 +12,6 @@ if(WIN32)
   include(InstallRequiredSystemLibraries)
 endif()
 
-find_package(TIFF REQUIRED)
-
 if(POLICY CMP0169)
   cmake_policy(SET CMP0169 OLD)
 endif()
@@ -48,7 +46,22 @@ FetchContent_Declare(
   GIT_TAG master
 )
 
-FetchContent_MakeAvailable(sdl2 imgui stb tinyfiledialogs)
+FetchContent_Declare(
+  tiff
+  GIT_REPOSITORY https://gitlab.com/libtiff/libtiff.git
+  GIT_TAG v4.7.0
+  GIT_SHALLOW TRUE
+)
+
+# Build libtiff as a static library with no optional external codec dependencies
+# so the installed binary has no unexpected runtime library requirements.
+foreach(_libtiff_opt IN ITEMS
+    tiff-tools tiff-tests tiff-contrib tiff-docs
+    jpeg old-jpeg jbig lzma zstd webp lerc libdeflate zlib)
+  set(${_libtiff_opt} OFF CACHE BOOL "" FORCE)
+endforeach()
+
+FetchContent_MakeAvailable(sdl2 imgui stb tinyfiledialogs tiff)
 
 add_library(imgui_lib STATIC
   ${imgui_SOURCE_DIR}/imgui.cpp
@@ -173,7 +186,7 @@ target_compile_definitions(
           PIXELSCOPE_METADATA_BRIDGE_PATH="${METADATA_BRIDGE_EXECUTABLE}"
           PIXELSCOPE_METADATA_BRIDGE_FILENAME="metadata_bridge${CMAKE_EXECUTABLE_SUFFIX}"
 )
-target_link_libraries(pixelscope_core PUBLIC SDL2::SDL2 imgui_lib tinyfiledialogs_lib TIFF::TIFF)
+target_link_libraries(pixelscope_core PUBLIC SDL2::SDL2 imgui_lib tinyfiledialogs_lib tiff)
 add_dependencies(pixelscope_core rawloader_bridge_build metadata_bridge_build)
 
 add_executable(pixelscope src/main.cpp)
@@ -242,35 +255,6 @@ install(TARGETS SDL2
   FRAMEWORK DESTINATION ${PIXELSCOPE_SHARED_LIBRARY_DESTINATION}
 )
 
-set(PIXELSCOPE_TIFF_RUNTIME_TARGET "")
-if(TARGET TIFF::tiff)
-  set(PIXELSCOPE_TIFF_RUNTIME_TARGET TIFF::tiff)
-elseif(TARGET TIFF::TIFF)
-  set(PIXELSCOPE_TIFF_RUNTIME_TARGET TIFF::TIFF)
-endif()
-
-set(PIXELSCOPE_TIFF_RUNTIME_FILES "")
-if(PIXELSCOPE_TIFF_RUNTIME_TARGET)
-  foreach(config_prop
-      IMPORTED_LOCATION
-      IMPORTED_LOCATION_RELEASE
-      IMPORTED_LOCATION_RELWITHDEBINFO
-      IMPORTED_LOCATION_MINSIZEREL
-      IMPORTED_LOCATION_DEBUG)
-    get_target_property(PIXELSCOPE_TIFF_RUNTIME_FILE ${PIXELSCOPE_TIFF_RUNTIME_TARGET} ${config_prop})
-    if(PIXELSCOPE_TIFF_RUNTIME_FILE AND EXISTS "${PIXELSCOPE_TIFF_RUNTIME_FILE}")
-      list(APPEND PIXELSCOPE_TIFF_RUNTIME_FILES "${PIXELSCOPE_TIFF_RUNTIME_FILE}")
-    endif()
-  endforeach()
-  list(REMOVE_DUPLICATES PIXELSCOPE_TIFF_RUNTIME_FILES)
-endif()
-
-if(PIXELSCOPE_TIFF_RUNTIME_FILES)
-  install(FILES ${PIXELSCOPE_TIFF_RUNTIME_FILES}
-    DESTINATION ${PIXELSCOPE_SHARED_LIBRARY_DESTINATION}
-  )
-endif()
-
 install(PROGRAMS
   "${RAWLOADER_BRIDGE_EXECUTABLE}"
   "${METADATA_BRIDGE_EXECUTABLE}"
@@ -331,27 +315,6 @@ endforeach()
     "include(\"${CMAKE_CURRENT_BINARY_DIR}/InstallWindowsRuntimeDeps-\${CMAKE_INSTALL_CONFIG_NAME}.cmake\")"
   )
   install(CODE "${PIXELSCOPE_WINDOWS_INSTALL_INCLUDE_CODE}")
-endif()
-
-if(APPLE)
-  set(PIXELSCOPE_MAC_INSTALL_SCRIPT [=[
-include(BundleUtilities)
-set(pixelscope_installed_executable "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/@CMAKE_INSTALL_BINDIR@/pixelscope")
-set(pixelscope_bundle_search_dirs
-  "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/@CMAKE_INSTALL_BINDIR@"
-  "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/Frameworks"
-)
-fixup_bundle("${pixelscope_installed_executable}" "" "${pixelscope_bundle_search_dirs}")
-]=])
-  string(CONFIGURE "${PIXELSCOPE_MAC_INSTALL_SCRIPT}" PIXELSCOPE_MAC_INSTALL_SCRIPT @ONLY)
-  file(GENERATE
-    OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/InstallMacRuntimeFixup-$<CONFIG>.cmake"
-    CONTENT "${PIXELSCOPE_MAC_INSTALL_SCRIPT}"
-  )
-  set(PIXELSCOPE_MAC_INSTALL_INCLUDE_CODE
-    "include(\"${CMAKE_CURRENT_BINARY_DIR}/InstallMacRuntimeFixup-\${CMAKE_INSTALL_CONFIG_NAME}.cmake\")"
-  )
-  install(CODE "${PIXELSCOPE_MAC_INSTALL_INCLUDE_CODE}")
 endif()
 
 install(FILES
