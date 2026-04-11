@@ -204,7 +204,20 @@ jobs:
             echo "No packaged files found in dist/" >&2
             exit 1
           fi
-          shasum -a 256 "${files[@]}" > "SHA256SUMS-${{ steps.artifact.outputs.value }}.txt"
+          python - "${{ steps.artifact.outputs.value }}" "${files[@]}" <<'PY'
+import hashlib
+import pathlib
+import sys
+
+artifact = sys.argv[1]
+paths = [pathlib.Path(arg) for arg in sys.argv[2:]]
+output = pathlib.Path(f"SHA256SUMS-{artifact}.txt")
+
+with output.open("w", encoding="utf-8") as handle:
+    for path in paths:
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        handle.write(f"{digest}  {path.name}\n")
+PY
 
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v4
