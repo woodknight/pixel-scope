@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 
-project(PixelScope VERSION 0.1.3 LANGUAGES CXX C)
+project(PixelScope VERSION 0.1.4 LANGUAGES CXX C)
 
 include(FetchContent)
 include(CTest)
@@ -210,6 +210,10 @@ elseif(UNIX)
 endif()
 
 if(WIN32)
+  # No console window – use Windows GUI subsystem.
+  set_target_properties(pixelscope PROPERTIES WIN32_EXECUTABLE TRUE)
+  # Embed the .ico so the taskbar, Alt+Tab, and Explorer show the correct icon.
+  target_sources(pixelscope PRIVATE src/pixelscope.rc)
   target_link_libraries(pixelscope PRIVATE SDL2::SDL2main)
   add_custom_command(TARGET pixelscope POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different

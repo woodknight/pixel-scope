@@ -1,0 +1,4 @@
+// Application icon resource – embedded into the PE so Windows uses it for
+// the taskbar, Alt+Tab switcher, and Explorer file icon.
+// Path is relative to this file (src/), so ../assets points at the repo root.
+IDI_APPICON ICON "../assets/icon/pixel-scope.ico"

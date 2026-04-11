@@ -287,6 +287,9 @@ namespace pixelscope::ui
     // the screen, making the window appear fullscreen and blurring all text.
     SDL_SetHint(SDL_HINT_WINDOWS_DPI_AWARENESS, "permonitorv2");
 #endif
+    // Set the application ID before SDL_Init so Wayland's xdg_toplevel
+    // app_id matches the pixelscope.desktop file, enabling dock icons.
+    SDL_SetHint("SDL_APP_ID", "pixelscope");
 
     if (SDL_Init(SDL_INIT_VIDEO) != 0)
     {

@@ -7,4 +7,5 @@ Icon=pixelscope
 Categories=Graphics;Viewer;
 Terminal=false
 StartupNotify=true
+StartupWMClass=pixelscope
 MimeType=image/png;image/jpeg;image/tiff;image/x-adobe-dng;
