@@ -278,53 +278,77 @@ install(PROGRAMS
 )
 
 if(WIN32)
+  set(PIXELSCOPE_WINDOWS_INSTALL_SCRIPT [=[
+set(pixelscope_executable "$<TARGET_FILE:pixelscope>")
+set(rawloader_bridge_executable "@RAWLOADER_BRIDGE_EXECUTABLE@")
+set(metadata_bridge_executable "@METADATA_BRIDGE_EXECUTABLE@")
+set(pixelscope_runtime_destination "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/@CMAKE_INSTALL_BINDIR@")
+set(pixelscope_runtime_search_dirs
+  "$<TARGET_FILE_DIR:pixelscope>"
+  "@RAWLOADER_BRIDGE_TARGET_DIR@/release"
+  "@METADATA_BRIDGE_TARGET_DIR@/release"
+)
+
+file(GET_RUNTIME_DEPENDENCIES
+  RESOLVED_DEPENDENCIES_VAR pixelscope_resolved_runtime_deps
+  UNRESOLVED_DEPENDENCIES_VAR pixelscope_unresolved_runtime_deps
+  EXECUTABLES
+    "${pixelscope_executable}"
+    "${rawloader_bridge_executable}"
+    "${metadata_bridge_executable}"
+  DIRECTORIES ${pixelscope_runtime_search_dirs}
+  PRE_EXCLUDE_REGEXES
+    "api-ms-"
+    "ext-ms-"
+    ".*[Hh][Vv][Ss][Ii][Ff]ile[Tt]rust\\.dll"
+    ".*[Ww][Tt][Dd][Cc][Cc][Mm]\\.dll"
+  POST_EXCLUDE_REGEXES
+    ".*/[Ss]ystem32/.*"
+)
+
+if(pixelscope_unresolved_runtime_deps)
+  list(JOIN pixelscope_unresolved_runtime_deps ", " pixelscope_unresolved_runtime_deps_message)
+  message(FATAL_ERROR
+    "Unresolved Windows runtime dependencies: ${pixelscope_unresolved_runtime_deps_message}"
+  )
+endif()
+
+list(REMOVE_DUPLICATES pixelscope_resolved_runtime_deps)
+foreach(runtime_dependency IN LISTS pixelscope_resolved_runtime_deps)
+  file(INSTALL
+    DESTINATION "${pixelscope_runtime_destination}"
+    TYPE SHARED_LIBRARY
+    FILES "${runtime_dependency}"
+  )
+endforeach()
+]=])
+  string(CONFIGURE "${PIXELSCOPE_WINDOWS_INSTALL_SCRIPT}" PIXELSCOPE_WINDOWS_INSTALL_SCRIPT @ONLY)
+  file(GENERATE
+    OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/InstallWindowsRuntimeDeps-$<CONFIG>.cmake"
+    CONTENT "${PIXELSCOPE_WINDOWS_INSTALL_SCRIPT}"
+  )
   install(CODE [[
-    file(GET_RUNTIME_DEPENDENCIES
-      RESOLVED_DEPENDENCIES_VAR pixelscope_resolved_runtime_deps
-      UNRESOLVED_DEPENDENCIES_VAR pixelscope_unresolved_runtime_deps
-      EXECUTABLES
-        "$<TARGET_FILE:pixelscope>"
-        "]] "${RAWLOADER_BRIDGE_EXECUTABLE}" [["
-        "]] "${METADATA_BRIDGE_EXECUTABLE}" [["
-      DIRECTORIES
-        "$<TARGET_FILE_DIR:pixelscope>"
-        "]] "${RAWLOADER_BRIDGE_TARGET_DIR}/release" [["
-        "]] "${METADATA_BRIDGE_TARGET_DIR}/release" [["
-      PRE_EXCLUDE_REGEXES
-        "api-ms-"
-        "ext-ms-"
-        ".*[Hh][Vv][Ss][Ii][Ff]ile[Tt]rust\\.dll"
-        ".*[Ww][Tt][Dd][Cc][Cc][Mm]\\.dll"
-      POST_EXCLUDE_REGEXES
-        ".*/[Ss]ystem32/.*"
-    )
-
-    if(pixelscope_unresolved_runtime_deps)
-      list(JOIN pixelscope_unresolved_runtime_deps ", " pixelscope_unresolved_runtime_deps_message)
-      message(FATAL_ERROR
-        "Unresolved Windows runtime dependencies: ${pixelscope_unresolved_runtime_deps_message}"
-      )
-    endif()
-
-    list(REMOVE_DUPLICATES pixelscope_resolved_runtime_deps)
-    foreach(runtime_dependency IN LISTS pixelscope_resolved_runtime_deps)
-      file(INSTALL
-        DESTINATION "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR}"
-        TYPE SHARED_LIBRARY
-        FILES "${runtime_dependency}"
-      )
-    endforeach()
+    include("${CMAKE_CURRENT_BINARY_DIR}/InstallWindowsRuntimeDeps-${CMAKE_INSTALL_CONFIG_NAME}.cmake")
   ]])
 endif()
 
 if(APPLE)
+  set(PIXELSCOPE_MAC_INSTALL_SCRIPT [=[
+include(BundleUtilities)
+set(pixelscope_installed_executable "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/@CMAKE_INSTALL_BINDIR@/pixelscope")
+set(pixelscope_bundle_search_dirs
+  "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/@CMAKE_INSTALL_BINDIR@"
+  "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/Frameworks"
+)
+fixup_bundle("${pixelscope_installed_executable}" "" "${pixelscope_bundle_search_dirs}")
+]=])
+  string(CONFIGURE "${PIXELSCOPE_MAC_INSTALL_SCRIPT}" PIXELSCOPE_MAC_INSTALL_SCRIPT @ONLY)
+  file(GENERATE
+    OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/InstallMacRuntimeFixup-$<CONFIG>.cmake"
+    CONTENT "${PIXELSCOPE_MAC_INSTALL_SCRIPT}"
+  )
   install(CODE [[
-    include(BundleUtilities)
-    fixup_bundle(
-      "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR}/pixelscope"
-      ""
-      "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR};${CMAKE_INSTALL_PREFIX}/Frameworks"
-    )
+    include("${CMAKE_CURRENT_BINARY_DIR}/InstallMacRuntimeFixup-${CMAKE_INSTALL_CONFIG_NAME}.cmake")
   ]])
 endif()
 
