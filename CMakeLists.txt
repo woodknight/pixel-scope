@@ -167,7 +167,7 @@ add_library(pixelscope_core STATIC
   src/core/viewport.cpp
   src/io/binary_raw_loader.cpp
   src/io/dng_loader.cpp
-  src/io/file_dialog.cpp
+  $<IF:$<PLATFORM_ID:Darwin>,src/io/file_dialog_macos.mm,src/io/file_dialog.cpp>
   src/io/image_loader.cpp
   src/io/metadata_loader.cpp
   src/platform/runtime_paths.cpp
@@ -187,6 +187,9 @@ target_compile_definitions(
           PIXELSCOPE_METADATA_BRIDGE_FILENAME="metadata_bridge${CMAKE_EXECUTABLE_SUFFIX}"
 )
 target_link_libraries(pixelscope_core PUBLIC SDL2::SDL2 imgui_lib tinyfiledialogs_lib tiff)
+if(APPLE)
+  target_link_libraries(pixelscope_core PUBLIC "-framework Cocoa" "-framework UniformTypeIdentifiers")
+endif()
 add_dependencies(pixelscope_core rawloader_bridge_build metadata_bridge_build)
 
 add_executable(pixelscope src/main.cpp)
