@@ -1,8 +1,8 @@
 <h1><img src="assets/icon/icon_256x256.png" alt="PixelScope icon" width="40" valign="middle"> PixelScope</h1>
 
-PixelScope is a cross-platform, lightweight desktop image inspection tool for exact pixel work. It is built for situations where you need to zoom deeply, pan quickly, inspect individual pixels, and verify what the image data is actually doing without interpolation or heavy viewer UI getting in the way.
+PixelScope is a simple, lightweight, and fast image inspection tool for exact pixel work. It lets you zoom in quickly, check pixel values, and view image statistics without a heavy interface getting in the way.
 
-The current app is a lightweight, efficient, minimalist SDL2 + Dear ImGui desktop viewer with a CPU-backed inspection path, nearest-neighbor rendering, and format loaders aimed at practical image debugging rather than image editing. The codebase is structured for macOS, Linux, and Windows builds through CMake and SDL renderer backends.
+It is built for practical inspection and debugging, with crisp nearest-neighbor rendering and reliable readout from the source image data.
 
 ## Screenshot
 
