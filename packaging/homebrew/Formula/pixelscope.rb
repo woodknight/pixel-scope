@@ -3,7 +3,7 @@ class Pixelscope < Formula
   homepage "https://github.com/woodknight/pixel-scope"
   url "https://github.com/woodknight/pixel-scope/releases/download/v1.0.0/pixelscope-1.0.0-macos-arm64.zip"
   version "1.0.0"
-  sha256 "aa1b38c5366636bec7a0eaf1b62422cf9064603d2a83f6211e7c4d4577b8674a"
+  sha256 "2e7d5a7678eeb09112d1796a4f917235c0dab2769fdb15e0ad60ea99babaf782"
   license "MIT"
 
   def install
