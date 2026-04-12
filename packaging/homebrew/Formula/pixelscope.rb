@@ -1,9 +1,9 @@
 class Pixelscope < Formula
   desc "Cross-platform pixel inspection desktop viewer"
   homepage "https://github.com/woodknight/pixel-scope"
-  url "https://github.com/woodknight/pixel-scope/releases/download/v0.1.4/pixelscope-0.1.4-macos-arm64.zip"
-  version "0.1.4"
-  sha256 "bb2486211a87bdbfe4f49b473433b3b5b3b25ab89534fc5e947c0d354bc19147"
+  url "https://github.com/woodknight/pixel-scope/releases/download/v1.0.0/pixelscope-1.0.0-macos-arm64.zip"
+  version "1.0.0"
+  sha256 "aa1b38c5366636bec7a0eaf1b62422cf9064603d2a83f6211e7c4d4577b8674a"
   license "MIT"
 
   def install
