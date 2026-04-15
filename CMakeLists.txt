@@ -338,10 +338,25 @@ install(FILES
 )
 
 if(UNIX AND NOT APPLE)
-  install(FILES
-    packaging/linux/pixelscope.desktop
-    DESTINATION ${CMAKE_INSTALL_DATADIR}/applications
-  )
+  set(PIXELSCOPE_LINUX_DESKTOP_INSTALL_CODE [=[
+set(pixelscope_desktop_dir "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/@CMAKE_INSTALL_DATADIR@/applications")
+file(MAKE_DIRECTORY "${pixelscope_desktop_dir}")
+file(WRITE "${pixelscope_desktop_dir}/pixelscope.desktop"
+  "[Desktop Entry]\n"
+  "Type=Application\n"
+  "Name=PixelScope\n"
+  "Comment=Cross-platform pixel inspection desktop viewer\n"
+  "Exec=env SDL_VIDEO_X11_WMCLASS=pixelscope SDL_VIDEO_WAYLAND_WMCLASS=pixelscope SDL_APP_NAME=PixelScope ${CMAKE_INSTALL_PREFIX}/@CMAKE_INSTALL_BINDIR@/pixelscope %U\n"
+  "Icon=${CMAKE_INSTALL_PREFIX}/@CMAKE_INSTALL_DATADIR@/pixelscope/icons/icon_256x256.png\n"
+  "Categories=Graphics;Viewer;\n"
+  "Terminal=false\n"
+  "StartupNotify=false\n"
+  "StartupWMClass=pixelscope\n"
+  "MimeType=image/png;image/jpeg;image/tiff;image/x-adobe-dng;\n"
+)
+]=])
+  string(CONFIGURE "${PIXELSCOPE_LINUX_DESKTOP_INSTALL_CODE}" PIXELSCOPE_LINUX_DESKTOP_INSTALL_CODE @ONLY)
+  install(CODE "${PIXELSCOPE_LINUX_DESKTOP_INSTALL_CODE}")
 
   install(FILES
     assets/icon/icon_64x64.png

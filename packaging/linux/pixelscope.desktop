@@ -2,10 +2,10 @@
 Type=Application
 Name=PixelScope
 Comment=Cross-platform pixel inspection desktop viewer
-Exec=pixelscope %U
+Exec=env SDL_VIDEO_X11_WMCLASS=pixelscope SDL_VIDEO_WAYLAND_WMCLASS=pixelscope SDL_APP_NAME=PixelScope pixelscope %U
 Icon=pixelscope
 Categories=Graphics;Viewer;
 Terminal=false
-StartupNotify=true
+StartupNotify=false
 StartupWMClass=pixelscope
 MimeType=image/png;image/jpeg;image/tiff;image/x-adobe-dng;

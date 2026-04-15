@@ -55,7 +55,11 @@ curl -L https://raw.githubusercontent.com/woodknight/pixel-scope/master/assets/i
   -o ~/.local/share/icons/hicolor/256x256/apps/pixelscope.png
 curl -L https://raw.githubusercontent.com/woodknight/pixel-scope/master/packaging/linux/pixelscope.desktop \
   -o ~/.local/share/applications/pixelscope.desktop
-sed -i "s|^Exec=.*|Exec=$HOME/.local/bin/pixelscope.AppImage %U|" \
+sed -i "s|^Exec=.*|Exec=env SDL_VIDEO_X11_WMCLASS=pixelscope SDL_VIDEO_WAYLAND_WMCLASS=pixelscope SDL_APP_NAME=PixelScope $HOME/.local/bin/pixelscope.AppImage %U|" \
+  ~/.local/share/applications/pixelscope.desktop
+sed -i "s|^Icon=.*|Icon=$HOME/.local/share/icons/hicolor/256x256/apps/pixelscope.png|" \
+  ~/.local/share/applications/pixelscope.desktop
+sed -i "s|^StartupNotify=.*|StartupNotify=false|" \
   ~/.local/share/applications/pixelscope.desktop
 chmod +x ~/.local/bin/pixelscope.AppImage
 update-desktop-database ~/.local/share/applications 2>/dev/null || true
@@ -64,6 +68,11 @@ gtk-update-icon-cache ~/.local/share/icons/hicolor 2>/dev/null || true
 
 Then launch PixelScope once from your desktop environment's app launcher and pin
 it to the dock if desired.
+
+If an old pinned PixelScope entry still fails to show in the dock after updating
+the app, unpin it first, launch PixelScope from the app launcher, then pin the
+new running window. Some desktop shells cache the launcher identity used by the
+old executable.
 
 Alternatively, download the `.tar.gz` archive, extract it, and run `bin/pixelscope`.
 
