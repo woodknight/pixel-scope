@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>PixelScope – Fast Pixel-Level Image Viewer</title>
+    <meta
+      name="description"
+      content="PixelScope is a fast pixel-level image viewer for precise image inspection, pixel value readout, RAW and DNG analysis, TIFF viewing, histogram overlays, metadata inspection, and responsive zoom for PNG, JPEG, TIFF, DNG, and binary Bayer raw images."
+    >
+    <meta
+      name="keywords"
+      content="PixelScope, pixel viewer, pixel-level image viewer, image inspection tool, pixel value readout, RAW image viewer, DNG viewer, TIFF viewer, Bayer raw viewer, histogram overlay, image metadata viewer, nearest-neighbor zoom, image debugging tool"
+    >
+    <meta name="author" content="Woodknight">
+    <meta property="og:title" content="PixelScope – Fast Pixel-Level Image Viewer">
+    <meta
+      property="og:description"
+      content="A lightweight desktop image inspection tool for crisp pixel-level zoom, exact pixel readout, RAW and DNG analysis, TIFF support, histograms, statistics, and metadata overlays."
+    >
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://woodknight.github.io/pixelscope">
+    <meta property="og:image" content="https://woodknight.github.io/pixelscope/assets/Screenshot.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="canonical" href="https://woodknight.github.io/pixelscope">
+    <link rel="icon" href="/pixelscope/assets/icon/icon_64x64.png" type="image/png">
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #162021;
+        --muted: #5d6867;
+        --paper: #fbfaf7;
+        --panel: #ffffff;
+        --line: #dde3df;
+        --teal: #0e766d;
+        --coral: #c84f31;
+        --gold: #d49121;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--paper);
+        color: var(--ink);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", sans-serif;
+        letter-spacing: 0;
+      }
+
+      a {
+        color: inherit;
+      }
+
+      .hero {
+        min-height: 86svh;
+        display: grid;
+        align-items: center;
+        position: relative;
+        isolation: isolate;
+        overflow: hidden;
+        background-image: url("/pixelscope/assets/Screenshot.png");
+        background-position: center;
+        background-size: cover;
+      }
+
+      .hero::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        z-index: -1;
+        background: rgba(251, 250, 247, 0.86);
+      }
+
+      .hero::after {
+        content: "";
+        position: absolute;
+        inset: auto 0 0;
+        height: 22%;
+        z-index: -1;
+        background: rgba(251, 250, 247, 0.9);
+      }
+
+      .wrap {
+        width: min(1120px, calc(100% - 40px));
+        margin: 0 auto;
+      }
+
+      .nav {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        padding: 22px 0;
+      }
+
+      .nav-inner {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+      }
+
+      .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        color: var(--ink);
+        font-weight: 800;
+        text-decoration: none;
+      }
+
+      .brand img {
+        width: 34px;
+        height: 34px;
+      }
+
+      .repo-link {
+        display: inline-flex;
+        align-items: center;
+        min-height: 42px;
+        padding: 0 16px;
+        border: 1px solid rgba(22, 32, 33, 0.24);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.72);
+        color: var(--ink);
+        font-weight: 700;
+        text-decoration: none;
+      }
+
+      .hero-content {
+        max-width: 760px;
+        padding: 120px 0 72px;
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 22px;
+        color: var(--teal);
+        font-size: 0.88rem;
+        font-weight: 800;
+        text-transform: uppercase;
+      }
+
+      .eyebrow::before {
+        content: "";
+        width: 42px;
+        height: 3px;
+        border-radius: 999px;
+        background: var(--coral);
+      }
+
+      h1 {
+        max-width: 880px;
+        margin: 0;
+        font-size: clamp(2.8rem, 8vw, 6.4rem);
+        line-height: 0.94;
+        letter-spacing: 0;
+      }
+
+      .description {
+        max-width: 690px;
+        margin: 28px 0 0;
+        color: #33413f;
+        font-size: clamp(1.08rem, 2vw, 1.35rem);
+        line-height: 1.58;
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 34px;
+      }
+
+      .button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 48px;
+        padding: 0 18px;
+        border-radius: 8px;
+        font-weight: 800;
+        text-decoration: none;
+      }
+
+      .primary {
+        background: var(--ink);
+        color: white;
+      }
+
+      .secondary {
+        border: 1px solid rgba(22, 32, 33, 0.24);
+        background: rgba(255, 255, 255, 0.72);
+      }
+
+      .section {
+        padding: 46px 0 66px;
+      }
+
+      .feature-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      .feature {
+        min-height: 142px;
+        padding: 20px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+      }
+
+      .feature strong {
+        display: block;
+        margin-bottom: 10px;
+        font-size: 1rem;
+      }
+
+      .feature p {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.5;
+      }
+
+      .accent {
+        width: 34px;
+        height: 4px;
+        margin-bottom: 18px;
+        border-radius: 999px;
+        background: var(--gold);
+      }
+
+      @media (max-width: 840px) {
+        .feature-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 560px) {
+        .wrap {
+          width: min(100% - 28px, 1120px);
+        }
+
+        .nav {
+          padding-top: 16px;
+        }
+
+        .brand span {
+          max-width: 140px;
+          line-height: 1.1;
+        }
+
+        .repo-link {
+          min-height: 38px;
+          padding-inline: 12px;
+          font-size: 0.92rem;
+        }
+
+        .hero-content {
+          padding: 112px 0 56px;
+        }
+
+        .description {
+          font-size: 1.04rem;
+        }
+
+        .actions {
+          flex-direction: column;
+        }
+
+        .button {
+          width: 100%;
+        }
+
+        .feature-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="hero" aria-labelledby="title">
+        <nav class="nav" aria-label="Primary">
+          <div class="wrap nav-inner">
+            <a class="brand" href="https://woodknight.github.io/pixelscope">
+              <img src="/pixelscope/assets/icon/icon_64x64.png" alt="" width="34" height="34">
+              <span>PixelScope</span>
+            </a>
+            <a class="repo-link" href="https://github.com/woodknight/pixel-scope">GitHub Repo</a>
+          </div>
+        </nav>
+
+        <div class="wrap hero-content">
+          <div class="eyebrow">Open-source image inspection</div>
+          <h1 id="title">PixelScope – Fast Pixel-Level Image Viewer</h1>
+          <p class="description">
+            PixelScope is a lightweight, cross-platform pixel-level image viewer for exact image inspection,
+            crisp nearest-neighbor zoom, source-based pixel value readout, RAW Bayer analysis, DNG and TIFF
+            viewing, histogram overlays, image statistics, and metadata review.
+          </p>
+          <div class="actions" aria-label="Project links">
+            <a class="button primary" href="https://github.com/woodknight/pixel-scope">View on GitHub</a>
+            <a class="button secondary" href="https://github.com/woodknight/pixel-scope/releases">Download Releases</a>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" aria-label="PixelScope highlights">
+        <div class="wrap feature-grid">
+          <article class="feature">
+            <div class="accent"></div>
+            <strong>Exact pixel readout</strong>
+            <p>Inspect source image coordinates and color values without softened presentation scaling.</p>
+          </article>
+          <article class="feature">
+            <div class="accent"></div>
+            <strong>RAW and DNG support</strong>
+            <p>Review Bayer raw data, CFA channels, DNG images, TIFF files, PNGs, and JPEGs in one viewer.</p>
+          </article>
+          <article class="feature">
+            <div class="accent"></div>
+            <strong>Fast zoom workflow</strong>
+            <p>Use responsive panning, fit-to-window, 1:1 zoom, minimap navigation, and crisp pixel grids.</p>
+          </article>
+          <article class="feature">
+            <div class="accent"></div>
+            <strong>Inspection overlays</strong>
+            <p>Toggle histograms, image statistics, metadata, auto contrast, and RAW CFA color visualization.</p>
+          </article>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
