@@ -337,6 +337,34 @@ install(FILES
   DESTINATION ${CMAKE_INSTALL_DATADIR}/pixelscope/icons
 )
 
+if(UNIX AND NOT APPLE)
+  install(FILES
+    packaging/linux/pixelscope.desktop
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/applications
+  )
+
+  install(FILES
+    assets/icon/icon_64x64.png
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/64x64/apps
+    RENAME pixelscope.png
+  )
+  install(FILES
+    assets/icon/icon_128x128.png
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/128x128/apps
+    RENAME pixelscope.png
+  )
+  install(FILES
+    assets/icon/icon_256x256.png
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/256x256/apps
+    RENAME pixelscope.png
+  )
+  install(FILES
+    assets/icon/icon_512x512.png
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/512x512/apps
+    RENAME pixelscope.png
+  )
+endif()
+
 set(CPACK_PACKAGE_NAME "PixelScope")
 set(CPACK_PACKAGE_VENDOR "PixelScope")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Cross-platform pixel inspection desktop viewer")
