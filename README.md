@@ -46,24 +46,13 @@ chmod +x pixelscope-<version>-linux-x86_64.AppImage
 ```
 
 To make PixelScope appear with its app icon in the Linux dock, app launcher, and
-window switcher, install a desktop entry for your user account:
+window switcher, use the
+[AppImage desktop installer](packaging/linux/install-appimage-desktop.sh):
 
 ```bash
-mkdir -p ~/.local/bin ~/.local/share/applications ~/.local/share/icons/hicolor/256x256/apps
-cp pixelscope-<version>-linux-x86_64.AppImage ~/.local/bin/pixelscope.AppImage
-curl -L https://raw.githubusercontent.com/woodknight/pixel-scope/master/assets/icon/icon_256x256.png \
-  -o ~/.local/share/icons/hicolor/256x256/apps/pixelscope.png
-curl -L https://raw.githubusercontent.com/woodknight/pixel-scope/master/packaging/linux/pixelscope.desktop \
-  -o ~/.local/share/applications/pixelscope.desktop
-sed -i "s|^Exec=.*|Exec=env SDL_VIDEO_X11_WMCLASS=pixelscope SDL_VIDEO_WAYLAND_WMCLASS=pixelscope SDL_APP_NAME=PixelScope $HOME/.local/bin/pixelscope.AppImage %U|" \
-  ~/.local/share/applications/pixelscope.desktop
-sed -i "s|^Icon=.*|Icon=$HOME/.local/share/icons/hicolor/256x256/apps/pixelscope.png|" \
-  ~/.local/share/applications/pixelscope.desktop
-sed -i "s|^StartupNotify=.*|StartupNotify=false|" \
-  ~/.local/share/applications/pixelscope.desktop
-chmod +x ~/.local/bin/pixelscope.AppImage
-update-desktop-database ~/.local/share/applications 2>/dev/null || true
-gtk-update-icon-cache ~/.local/share/icons/hicolor 2>/dev/null || true
+curl -L -o install-appimage-desktop.sh \
+  https://raw.githubusercontent.com/woodknight/pixel-scope/master/packaging/linux/install-appimage-desktop.sh
+bash install-appimage-desktop.sh ./pixelscope-<version>-linux-x86_64.AppImage
 ```
 
 Then launch PixelScope once from your desktop environment's app launcher and pin
